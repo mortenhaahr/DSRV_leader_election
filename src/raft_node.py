@@ -5,7 +5,13 @@ from enum import Enum
 import random
 from typing import List
 
-from src.messages import AppendEntries, ElectionMessage, RequestVote
+from src.messages import (
+    AppendEntries,
+    AppendEntriesResponse,
+    ElectionMessage,
+    RequestVote,
+    RequestVoteResponse,
+)
 
 
 class Role(Enum):
@@ -24,11 +30,21 @@ class _RoleBehavior(ABC):
     def handle_tick(self, node: RaftNode) -> List[ElectionMessage]:
         pass
 
+    @abstractmethod
+    def handle_message(self, node: RaftNode, message: ElectionMessage) -> List[ElectionMessage]:
+        pass
+
 
 class _FollowerBehavior(_RoleBehavior):
-    def __init__(self, last_heartbeat_ms: int, next_deadline: int):
+    def __init__(
+        self,
+        last_heartbeat_ms: int,
+        next_deadline: int,
+        voted_for: int | None = None,
+    ):
         self.last_heartbeat_ms = last_heartbeat_ms
         self.next_deadline = next_deadline
+        self.voted_for = voted_for
 
     @property
     def role(self) -> Role:
@@ -37,6 +53,70 @@ class _FollowerBehavior(_RoleBehavior):
     def handle_tick(self, node: RaftNode) -> List[ElectionMessage]:
         if node.current_time_ms - self.last_heartbeat_ms >= self.next_deadline:
             return node._become_candidate()
+        return []
+    
+    def _handle_message_request_vote(self, node: RaftNode, message: RequestVote) -> List[ElectionMessage]:
+        if message.term < node.current_term:
+            return [
+                RequestVoteResponse(
+                    term=node.current_term,
+                    voter_id=node.node_id,
+                    vote_granted=False,
+                )
+            ]
+
+        if message.term > node.current_term:
+            node.current_term = message.term
+            self.voted_for = None
+
+        grant_vote = self.voted_for in (None, message.candidate_id)
+        if grant_vote:
+            self.voted_for = message.candidate_id
+            self.last_heartbeat_ms = node.current_time_ms
+            self.next_deadline = node._draw_election_deadline()
+
+        return [
+            RequestVoteResponse(
+                term=node.current_term,
+                voter_id=node.node_id,
+                vote_granted=grant_vote,
+            )
+        ]
+
+    def _handle_message_append_entries(self, node: RaftNode, message: AppendEntries) -> List[ElectionMessage]:
+        if message.term < node.current_term:
+            return [
+                AppendEntriesResponse(
+                    term=node.current_term,
+                    follower_id=node.node_id,
+                    success=False,
+                )
+            ]
+
+        if message.term > node.current_term:
+            node.current_term = message.term
+            self.voted_for = None
+
+        self.last_heartbeat_ms = node.current_time_ms
+        self.next_deadline = node._draw_election_deadline()
+        return [
+            AppendEntriesResponse(
+                term=node.current_term,
+                follower_id=node.node_id,
+                success=True,
+            )
+        ]
+
+    def handle_message(
+        self, node: RaftNode, message: ElectionMessage
+    ) -> List[ElectionMessage]:
+        if isinstance(message, RequestVote):
+            return self._handle_message_request_vote(node, message)
+
+        if isinstance(message, AppendEntries):
+            return self._handle_message_append_entries(node, message)
+
+        # TODO: Error response for unexpected message types in this role
         return []
 
 
@@ -65,6 +145,62 @@ class _CandidateBehavior(_RoleBehavior):
             return node._become_candidate()
 
         return []
+    
+    def _handle_message_request_vote_response(self, node: RaftNode, message: RequestVoteResponse) -> List[ElectionMessage]:
+        if message.term > node.current_term:
+            node._become_follower(term=message.term)
+            return []
+
+        if message.term < node.current_term:
+            return []
+
+        if message.vote_granted and message.voter_id not in self.votes_from:
+            self.votes_from.add(message.voter_id)
+            self.votes_received += 1
+            if self.votes_received >= node._quorum_size():
+                return node._become_leader()
+
+        return []
+    
+    def _handle_message_request_vote(self, node: RaftNode, message: RequestVote) -> List[ElectionMessage]:
+        if message.term > node.current_term:
+            node._become_follower(term=message.term)
+            return node.handle_message(message)
+
+        return [
+            RequestVoteResponse(
+                term=node.current_term,
+                voter_id=node.node_id,
+                vote_granted=False,
+            )
+        ]
+    
+    def _handle_message_append_entries(self, node: RaftNode, message: AppendEntries) -> List[ElectionMessage]:
+        if message.term >= node.current_term:
+            node._become_follower(term=message.term)
+            return node.handle_message(message)
+
+        return [
+            AppendEntriesResponse(
+                term=node.current_term,
+                follower_id=node.node_id,
+                success=False,
+            )
+        ]
+
+    def handle_message(
+        self, node: RaftNode, message: ElectionMessage
+    ) -> List[ElectionMessage]:
+        if isinstance(message, RequestVoteResponse):
+            return self._handle_message_request_vote_response(node, message)
+
+        if isinstance(message, RequestVote):
+            return self._handle_message_request_vote(node, message)
+
+        if isinstance(message, AppendEntries):
+            return self._handle_message_append_entries(node, message)
+
+        return []
 
 
 class _LeaderBehavior(_RoleBehavior):
@@ -83,6 +219,52 @@ class _LeaderBehavior(_RoleBehavior):
         ):
             self.last_heartbeat_sent_ms = node.current_time_ms
             return [AppendEntries(term=node.current_term, leader_id=node.node_id)]
+
+        return []
+    
+    def _handle_message_request_vote(self, node: RaftNode, message: RequestVote) -> List[ElectionMessage]:
+        if message.term > node.current_term:
+            node._become_follower(term=message.term)
+            return node.handle_message(message)
+
+        return [
+            RequestVoteResponse(
+                term=node.current_term,
+                voter_id=node.node_id,
+                vote_granted=False,
+            )
+        ]
+    
+    def _handle_message_append_entries(self, node: RaftNode, message: AppendEntries) -> List[ElectionMessage]:
+        if message.term > node.current_term:
+            node._become_follower(term=message.term)
+            return node.handle_message(message)
+
+        return [
+            AppendEntriesResponse(
+                term=node.current_term,
+                follower_id=node.node_id,
+                success=False,
+            )
+        ]
+    
+    def _handle_message_append_entries_response(self, node: RaftNode, message: AppendEntriesResponse) -> List[ElectionMessage]:
+        if message.term > node.current_term:
+            node._become_follower(term=message.term)
+            return []
+        return []
+
+    def handle_message(
+        self, node: RaftNode, message: ElectionMessage
+    ) -> List[ElectionMessage]:
+        if isinstance(message, RequestVote):
+            return self._handle_message_request_vote(node, message)
+
+        if isinstance(message, AppendEntries):
+            return self._handle_message_append_entries(node, message)
+
+        if isinstance(message, AppendEntriesResponse):
+            return self._handle_message_append_entries_response(node, message)
 
         return []
 
@@ -114,6 +296,10 @@ class RaftNode:
         self.current_time_ms = tick_time_ms
         return self._behavior.handle_tick(self)
 
+    def handle_message(self, message: ElectionMessage) -> List[ElectionMessage]:
+        """Dispatch an incoming election message to the current role behavior."""
+        return self._behavior.handle_message(self, message)
+
     def _transition_to(self, behavior: _RoleBehavior) -> None:
         self._behavior = behavior
         self.state = behavior.role
@@ -131,6 +317,7 @@ class RaftNode:
             _FollowerBehavior(
                 last_heartbeat_ms=self.current_time_ms,
                 next_deadline=self._draw_election_deadline(),
+                voted_for=None,
             )
         )
 
