@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from src.raft_node import Follower
+from src.raft_node import RaftNode
 
 
 class Simulation:
     def run(self) -> None:
         N = 3
-        nodes = [Follower(node_id=i, seed=i) for i in range(N)]
+        nodes = [RaftNode(node_id=i, seed=i) for i in range(N)]
         tick_inc = 100
         messages = []
         for tick in range(0, 1000, tick_inc):
