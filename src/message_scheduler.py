@@ -1,5 +1,7 @@
 from collections import deque
 from typing import List
+import logging
+
 from src.messages import ElectionMessage
 from src.filters import ScheduleAction, Filter
 
@@ -25,6 +27,7 @@ class MessageScheduler:
 
     def deliver_messages(self, current_tick: int) -> List[ElectionMessage]:
         """Return all messages scheduled where no filter delays or drops them."""
+        logger = logging.getLogger()
         to_deliver = []
         remaining = deque()
         while self._scheduled:
@@ -33,7 +36,7 @@ class MessageScheduler:
             for filter_obj in self._filters:
                 result = filter_obj.filter(message, current_tick)
                 if result == ScheduleAction.DROP:
-                    # TODO: Log dropped message in debug
+                    logger.debug(f"Dropping message {message}")
                     action = ScheduleAction.DROP
                     break
                 elif result == ScheduleAction.DELAY:

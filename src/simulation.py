@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import random
+import logging
 
-from src.log_config import configure_logging
+from src.log_config import set_tick_time
 from src.raft_node import RaftNode, Role
 from src.message_scheduler import MessageScheduler
 from src.filters import CrashFilter, SenderReceiverFilter, LatencyFilter, TimedFilter
@@ -24,7 +24,7 @@ class Simulation:
         self.node_timeout_range = node_timeout_limits
 
     def run(self) -> None:
-        logging, tick_filter = configure_logging()
+        logger = logging.getLogger()
         nodes = [
             RaftNode(
                 node_id=i,
@@ -50,7 +50,7 @@ class Simulation:
 
         next_tick_messages = []
         for tick in range(0, int(self.duration_s * 1000), tick_ms):
-            tick_filter.set_tick(tick)
+            set_tick_time(tick)
 
             if tick == 200:
                 leader_id = next(

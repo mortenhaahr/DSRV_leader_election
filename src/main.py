@@ -2,9 +2,11 @@ import random
 
 from src.simulation import Simulation
 from src.parser import parse_args
+from src.log_config import configure_logging
 
 if __name__ == "__main__":
     args = parse_args()
+    _ = configure_logging(args.log_level)
     simulation = Simulation(
         seed=args.seed,
         num_nodes=args.num_nodes,

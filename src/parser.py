@@ -1,6 +1,8 @@
 import argparse
 import random
 
+from src.log_config import LOG_LEVELS
+
 
 def positive_float(x: str) -> float:
     v = float(x)
@@ -17,8 +19,6 @@ def positive_int(s: str) -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    LOG_LEVELS = ("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG")
-
     parser = argparse.ArgumentParser(
         description="RAFT leader-election simulation.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
