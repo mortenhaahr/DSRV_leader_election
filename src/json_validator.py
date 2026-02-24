@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from jsonschema import Draft202012Validator
@@ -14,10 +13,13 @@ FILTER_SCHEMA: dict[str, Any] = {
         "sim_config": {
             "type": "object",
             "additionalProperties": False,
-            "required": ["filter"],
+            "required": ["filters"],
             "properties": {
                 "duration_s": {"type": "number", "exclusiveMinimum": 0},
-                "filter": {"$ref": "#/$defs/filter"},
+                "filters": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/filter"},
+                },
             },
         },
         "filter": {
