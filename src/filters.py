@@ -1,13 +1,22 @@
-from enum import Enum, auto
-from typing import Optional, Protocol
-from src.messages import ElectionMessage
+from enum import Enum
+from typing import Protocol
 import random
 
+from src.messages import ElectionMessage
 
+
+# Should propably live in message_scheduler.py, but this avoids recursive imports
 class ScheduleAction(Enum):
-    DELIVER = auto()
-    DELAY = auto()
-    DROP = auto()
+    DELIVER = 0
+    DELAY = 1
+    DROP = 2
+
+
+def prioritize_actions(actions: list[ScheduleAction]) -> ScheduleAction:
+    """Return the highest-priority action from a list of ScheduleActions."""
+    if not actions:
+        return ScheduleAction.DELIVER
+    return max(actions, key=lambda a: a.value)
 
 
 class Filter(Protocol):
@@ -93,18 +102,7 @@ class SenderReceiverFilter:
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
         sender_action = self.sender_filter.filter(message, current_tick)
         receiver_action = self.receiver_filter.filter(message, current_tick)
-        if (
-            sender_action == ScheduleAction.DROP
-            or receiver_action == ScheduleAction.DROP
-        ):
-            return ScheduleAction.DROP
-        elif (
-            sender_action == ScheduleAction.DELAY
-            or receiver_action == ScheduleAction.DELAY
-        ):
-            return ScheduleAction.DELAY
-        else:
-            return ScheduleAction.DELIVER
+        return prioritize_actions([sender_action, receiver_action])
 
 
 class LatencyFilter:

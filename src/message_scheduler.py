@@ -3,7 +3,7 @@ from typing import List
 import logging
 
 from src.messages import ElectionMessage
-from src.filters import ScheduleAction, Filter
+from src.filters import Filter, ScheduleAction, prioritize_actions
 
 
 class MessageScheduler:
@@ -32,16 +32,13 @@ class MessageScheduler:
         remaining = deque()
         while self._scheduled:
             message = self._scheduled.popleft()
-            action = ScheduleAction.DELIVER
-            for filter_obj in self._filters:
-                result = filter_obj.filter(message, current_tick)
-                if result == ScheduleAction.DROP:
-                    logger.debug(f"Dropping message {message}")
-                    action = ScheduleAction.DROP
-                    break
-                elif result == ScheduleAction.DELAY:
-                    action = ScheduleAction.DELAY
-            if action == ScheduleAction.DELIVER:
+            actions = [
+                filter_obj.filter(message, current_tick) for filter_obj in self._filters
+            ]
+            action = prioritize_actions(actions)
+            if action == ScheduleAction.DROP:
+                logger.debug(f"Dropping message {message}")
+            elif action == ScheduleAction.DELIVER:
                 to_deliver.append(message)
             elif action == ScheduleAction.DELAY:
                 remaining.append(message)
