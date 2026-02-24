@@ -1,5 +1,5 @@
 from enum import Enum, auto
-from typing import Protocol
+from typing import Optional, Protocol
 from src.messages import ElectionMessage
 import random
 
@@ -14,10 +14,102 @@ class Filter(Protocol):
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction: ...
 
 
-class GeneralLatencyFilter:
+class TimedFilter:
     """
-    Simulates general network latency by randomly delaying messages.
-    The delay does not depend on message type or sender/receiver.
+    Applies the inner filter only during a specified tick interval.
+    """
+
+    def __init__(
+        self,
+        inner: Filter,
+        start_tick: int,
+        duration: int,
+    ):
+        self.inner = inner
+        self.start_tick = start_tick
+        self.end_tick = start_tick + duration
+
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
+        if self.start_tick <= current_tick < self.end_tick:
+            return self.inner.filter(message, current_tick)
+        else:
+            return ScheduleAction.DELIVER
+
+
+class SenderFilter:
+    """
+    Applies the inner filter only to messages sent by a specific sender.
+    """
+
+    def __init__(
+        self,
+        inner: Filter,
+        sender_id: int,
+    ):
+        self.inner = inner
+        self.sender_id = sender_id
+
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
+        if message.sender == self.sender_id:
+            return self.inner.filter(message, current_tick)
+        else:
+            return ScheduleAction.DELIVER
+
+
+class ReceiverFilter:
+    """
+    Applies the inner filter only to messages received by a specific receiver.
+    """
+
+    def __init__(
+        self,
+        inner: Filter,
+        receiver_id: int,
+    ):
+        self.inner = inner
+        self.receiver_id = receiver_id
+
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
+        if message.receiver == self.receiver_id:
+            return self.inner.filter(message, current_tick)
+        else:
+            return ScheduleAction.DELIVER
+
+
+class SenderReceiverFilter:
+    """
+    Applies the inner filter to messages sent or received by a specific node.
+    """
+
+    def __init__(
+        self,
+        inner: Filter,
+        node_id: int,
+    ):
+        self.inner = inner
+        self.sender_filter = SenderFilter(inner, sender_id=node_id)
+        self.receiver_filter = ReceiverFilter(inner, receiver_id=node_id)
+
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
+        sender_action = self.sender_filter.filter(message, current_tick)
+        receiver_action = self.receiver_filter.filter(message, current_tick)
+        if (
+            sender_action == ScheduleAction.DROP
+            or receiver_action == ScheduleAction.DROP
+        ):
+            return ScheduleAction.DROP
+        elif (
+            sender_action == ScheduleAction.DELAY
+            or receiver_action == ScheduleAction.DELAY
+        ):
+            return ScheduleAction.DELAY
+        else:
+            return ScheduleAction.DELIVER
+
+
+class LatencyFilter:
+    """
+    Delays messages by a random amount, based on a delay distribution.
     """
 
     def __init__(self, delay_distribution: tuple[int, int], seed: int):
@@ -26,7 +118,7 @@ class GeneralLatencyFilter:
         self.random = random.Random(seed)
 
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
-        msg_id = getattr(message, "message_id", None)
+        msg_id = message.msg_id
         if msg_id in self.delay_schedule:
             if current_tick >= self.delay_schedule[msg_id]:
                 del self.delay_schedule[msg_id]
@@ -39,36 +131,10 @@ class GeneralLatencyFilter:
             return ScheduleAction.DELAY
 
 
-class NodeLatencyFilter:
-    """
-    Simulates network latency for messages sent from a specific node only.
-    Other messages are delivered immediately.
-    """
-
-    def __init__(self, node_id: int, delay_distribution: tuple[int, int], seed: int):
-        self.node_id = node_id
-        self._filter = GeneralLatencyFilter(delay_distribution, seed)
-
-    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
-        if message.sender == self.node_id:
-            return self._filter.filter(message, current_tick)
-        else:
-            return ScheduleAction.DELIVER
-
-
 class CrashFilter:
     """
-    Drops all messages sent or received by a node during a crash interval.
-    Messages are dropped if current_tick is in [start_tick, start_tick + duration).
+    Drops all messages unconditionally.
     """
 
-    def __init__(self, node_id: int, start_tick: int, duration: int):
-        self.node_id = node_id
-        self.start_tick = start_tick
-        self.end_tick = start_tick + duration
-
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
-        if self.start_tick <= current_tick < self.end_tick:
-            if message.sender == self.node_id or message.receiver == self.node_id:
-                return ScheduleAction.DROP
-        return ScheduleAction.DELIVER
+        return ScheduleAction.DROP

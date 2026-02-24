@@ -5,11 +5,7 @@ import random
 from src.log_config import configure_logging
 from src.raft_node import RaftNode, Role
 from src.message_scheduler import MessageScheduler
-from src.filters import (
-    GeneralLatencyFilter,
-    NodeLatencyFilter,
-    CrashFilter,
-)
+from src.filters import CrashFilter, SenderReceiverFilter, LatencyFilter, TimedFilter
 
 
 class Simulation:
@@ -41,8 +37,13 @@ class Simulation:
         tick_ms = self.tick_ms
         scheduler = MessageScheduler()
         filters = [
-            GeneralLatencyFilter(delay_distribution=(2, 10), seed=self.seed + 1),
-            # NodeLatencyFilter(node_id=0, delay_distribution=(30, 100), seed=self.seed + 2),
+            LatencyFilter(
+                delay_distribution=(2, 10), seed=self.seed + 1
+            ),  # Overall latency
+            SenderReceiverFilter(
+                LatencyFilter(delay_distribution=(30, 100), seed=self.seed + 2),
+                node_id=0,
+            ),  # Higher latency for node 0
         ]
         for f in filters:
             scheduler.add_filter(f)
@@ -59,8 +60,13 @@ class Simulation:
                     logging.info(
                         f"Simulating crash of leader node {leader_id} at tick {tick}"
                     )
-                    crash_filter = CrashFilter(
-                        node_id=leader_id, start_tick=tick, duration=200
+                    crash_filter = TimedFilter(
+                        SenderReceiverFilter(
+                            CrashFilter(),
+                            node_id=leader_id,
+                        ),
+                        start_tick=tick,
+                        duration=150,
                     )
                     scheduler.add_filter(crash_filter)
                 else:
