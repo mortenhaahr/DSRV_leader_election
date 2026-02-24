@@ -166,7 +166,7 @@ class _CandidateBehavior(_RoleBehavior):
             self.votes_from.add(message.voter_id)
             self.votes_received += 1
             if self.votes_received >= node._quorum_size():
-                # Leader sends AppendEntries to all other nodes
+                # Leader sends AppendEntries to all other nodes as heartbeat
                 return [
                     AppendEntries(
                         term=node.current_term,
@@ -200,6 +200,7 @@ class _CandidateBehavior(_RoleBehavior):
             node._become_follower(term=message.term)
             return node.handle_message(message)
 
+        # Send failure response to lower term AppendEntries
         return [
             AppendEntriesResponse(
                 term=node.current_term,
@@ -274,6 +275,7 @@ class _LeaderBehavior(_RoleBehavior):
             node._become_follower(term=message.term)
             return node.handle_message(message)
 
+        # Send failure response to lower term AppendEntries
         return [
             AppendEntriesResponse(
                 term=node.current_term,
@@ -386,7 +388,7 @@ class RaftNode:
                 last_heartbeat_sent_ms=self.current_time_ms,
             )
         )
-        # Send AppendEntries to all other nodes
+        # Send initial AppendEntries to all other nodes as heartbeat
         return [
             AppendEntries(
                 term=self.current_term,
