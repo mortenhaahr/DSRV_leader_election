@@ -19,6 +19,30 @@ class Filter(Protocol):
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction: ...
 
 
+class GeneralLatencyFilter:
+    """
+    Simulates general network latency by randomly delaying messages.
+    The delay does not depend on message type or sender/receiver.
+    """
+
+    def __init__(self, delay_distribution: tuple[int, int], seed: int):
+        self.delay_schedule = {}  # message_id -> deliver_tick
+        self.delay_distribution = delay_distribution
+        self.random = random.Random(seed)
+
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
+        if message.msg_id in self.delay_schedule:
+            if current_tick >= self.delay_schedule[message.msg_id]:
+                del self.delay_schedule[message.msg_id]
+                return ScheduleAction.DELIVER
+            else:
+                return ScheduleAction.DELAY
+        else:
+            delay = self.random.randint(*self.delay_distribution)
+            self.delay_schedule[message.msg_id] = current_tick + delay
+            return ScheduleAction.DELAY
+
+
 class MessageScheduler:
     """
     Generic scheduler for messages/events, extensible via Filter objects.

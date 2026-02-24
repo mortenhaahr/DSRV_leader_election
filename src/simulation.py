@@ -4,16 +4,18 @@ import random
 
 from src.log_config import configure_logging
 from src.raft_node import RaftNode
-from src.message_scheduler import MessageScheduler
+from src.message_scheduler import MessageScheduler, GeneralLatencyFilter
 
 
 class Simulation:
     def run(self, seed: int, num_nodes: int) -> None:
-        logger, tick_filter = configure_logging()
+        _, tick_filter = configure_logging()
         nodes = [RaftNode(node_id=i, seed=seed + i) for i in range(num_nodes)]
         tick_inc = 1
         scheduler = MessageScheduler()
-        # No filters for now
+        filters = [GeneralLatencyFilter(delay_distribution=(2, 10), seed=seed)]
+        for f in filters:
+            scheduler.add_filter(f)
 
         next_tick_messages = []
         for tick in range(0, 500, tick_inc):
