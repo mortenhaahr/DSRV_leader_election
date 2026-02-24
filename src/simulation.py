@@ -3,17 +3,18 @@ from __future__ import annotations
 import random
 
 from src.log_config import configure_logging
-from src.raft_node import RaftNode
+from src.raft_node import RaftNode, Role
 from src.message_scheduler import (
     MessageScheduler,
     GeneralLatencyFilter,
     NodeLatencyFilter,
+    CrashFilter,
 )
 
 
 class Simulation:
     def run(self, seed: int, num_nodes: int) -> None:
-        _, tick_filter = configure_logging()
+        logging, tick_filter = configure_logging()
         nodes = [RaftNode(node_id=i, seed=seed + i) for i in range(num_nodes)]
         tick_inc = 1
         scheduler = MessageScheduler()
@@ -27,6 +28,21 @@ class Simulation:
         next_tick_messages = []
         for tick in range(0, 500, tick_inc):
             tick_filter.set_tick(tick)
+
+            if tick == 200:
+                leader_id = next(
+                    (node.node_id for node in nodes if node.state == Role.LEADER), None
+                )
+                if leader_id is not None:
+                    logging.info(
+                        f"Simulating crash of leader node {leader_id} at tick {tick}"
+                    )
+                    crash_filter = CrashFilter(
+                        node_id=leader_id, start_tick=tick, duration=200
+                    )
+                    scheduler.add_filter(crash_filter)
+                else:
+                    logging.warning(f"No leader found at tick {tick} to crash.")
 
             # Schedule messages generated in the previous tick
             if next_tick_messages:
