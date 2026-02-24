@@ -4,7 +4,11 @@ import random
 
 from src.log_config import configure_logging
 from src.raft_node import RaftNode
-from src.message_scheduler import MessageScheduler, GeneralLatencyFilter
+from src.message_scheduler import (
+    MessageScheduler,
+    GeneralLatencyFilter,
+    NodeLatencyFilter,
+)
 
 
 class Simulation:
@@ -13,7 +17,10 @@ class Simulation:
         nodes = [RaftNode(node_id=i, seed=seed + i) for i in range(num_nodes)]
         tick_inc = 1
         scheduler = MessageScheduler()
-        filters = [GeneralLatencyFilter(delay_distribution=(2, 10), seed=seed)]
+        filters = [
+            GeneralLatencyFilter(delay_distribution=(2, 10), seed=seed + 1),
+            # NodeLatencyFilter(node_id=0, delay_distribution=(30, 100), seed=seed + 2),
+        ]
         for f in filters:
             scheduler.add_filter(f)
 

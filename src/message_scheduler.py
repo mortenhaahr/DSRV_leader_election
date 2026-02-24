@@ -43,6 +43,24 @@ class GeneralLatencyFilter:
             return ScheduleAction.DELAY
 
 
+class NodeLatencyFilter:
+    """
+    Simulates network latency for messages sent from a specific node only.
+    Other messages are delivered immediately.
+    """
+
+    def __init__(self, node_id: int, delay_distribution: tuple[int, int], seed: int):
+        self.node_id = node_id
+        self._filter = GeneralLatencyFilter(delay_distribution, seed)
+
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
+        # Only apply latency if sender matches node_id
+        if message.sender == self.node_id:
+            return self._filter.filter(message, current_tick)
+        else:
+            return ScheduleAction.DELIVER
+
+
 class MessageScheduler:
     """
     Generic scheduler for messages/events, extensible via Filter objects.
