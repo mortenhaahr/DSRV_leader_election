@@ -61,9 +61,3 @@ class Simulation:
                     if node.node_id == message.receiver:
                         next_tick_messages.extend(node.handle_message(message))
                         break
-
-
-if __name__ == "__main__":
-    simulation = Simulation()
-    seed = random.randint(0, 100000)
-    simulation.run(seed=seed, num_nodes=3)
