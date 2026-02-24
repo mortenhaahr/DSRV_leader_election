@@ -8,9 +8,9 @@ from src.message_scheduler import MessageScheduler
 
 
 class Simulation:
-    def run(self, seed : int, num_nodes : int) -> None:
+    def run(self, seed: int, num_nodes: int) -> None:
         logger, tick_filter = configure_logging()
-        nodes = [RaftNode(node_id=i, seed=seed+i) for i in range(num_nodes)]
+        nodes = [RaftNode(node_id=i, seed=seed + i) for i in range(num_nodes)]
         tick_inc = 1
         scheduler = MessageScheduler()
         # No filters for now
@@ -36,7 +36,6 @@ class Simulation:
                     if node.node_id == message.receiver:
                         next_tick_messages.extend(node.handle_message(message))
                         break
-
 
 
 if __name__ == "__main__":

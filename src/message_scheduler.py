@@ -14,15 +14,17 @@ class ScheduleAction(Enum):
     DELAY = auto()
     DROP = auto()
 
+
 class Filter(Protocol):
-    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
-        ...
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction: ...
+
 
 class MessageScheduler:
     """
     Generic scheduler for messages/events, extensible via Filter objects.
     Filters determine if a message should be delivered, delayed, or dropped.
     """
+
     def __init__(self):
         # delivery_tick -> deque of (message, receiver_id)
         self._scheduled = deque()
@@ -46,7 +48,7 @@ class MessageScheduler:
             for filter_obj in self._filters:
                 result = filter_obj.filter(message, current_tick)
                 if result == ScheduleAction.DROP:
-                    # TODO: Log dropped message in debug 
+                    # TODO: Log dropped message in debug
                     action = ScheduleAction.DROP
                     break
                 elif result == ScheduleAction.DELAY:

@@ -33,7 +33,9 @@ class _RoleBehavior(ABC):
         pass
 
     @abstractmethod
-    def handle_message(self, node: RaftNode, message: ElectionMessage) -> List[ElectionMessage]:
+    def handle_message(
+        self, node: RaftNode, message: ElectionMessage
+    ) -> List[ElectionMessage]:
         pass
 
 
@@ -56,8 +58,10 @@ class _FollowerBehavior(_RoleBehavior):
         if node.current_time_ms - self.last_heartbeat_ms >= self.next_deadline:
             return node._become_candidate()
         return []
-    
-    def _handle_message_request_vote(self, node: RaftNode, message: RequestVote) -> List[ElectionMessage]:
+
+    def _handle_message_request_vote(
+        self, node: RaftNode, message: RequestVote
+    ) -> List[ElectionMessage]:
         if message.term < node.current_term:
             return [
                 RequestVoteResponse(
@@ -89,7 +93,9 @@ class _FollowerBehavior(_RoleBehavior):
             )
         ]
 
-    def _handle_message_append_entries(self, node: RaftNode, message: AppendEntries) -> List[ElectionMessage]:
+    def _handle_message_append_entries(
+        self, node: RaftNode, message: AppendEntries
+    ) -> List[ElectionMessage]:
         if message.term < node.current_term:
             return [
                 AppendEntriesResponse(
@@ -155,9 +161,12 @@ class _CandidateBehavior(_RoleBehavior):
             return node._become_candidate()
 
         return []
-    
-    def _handle_message_request_vote_response(self, node: RaftNode, message: RequestVoteResponse) -> List[ElectionMessage]:
+
+    def _handle_message_request_vote_response(
+        self, node: RaftNode, message: RequestVoteResponse
+    ) -> List[ElectionMessage]:
         import logging
+
         if message.term > node.current_term:
             node._become_follower(term=message.term)
             return []
@@ -169,13 +178,17 @@ class _CandidateBehavior(_RoleBehavior):
             self.votes_from.add(message.voter_id)
             self.votes_received += 1
             logger = logging.getLogger()
-            logger.info(f"Node {node.node_id} (candidate) received vote from {message.voter_id}: {self.votes_received}/{node._quorum_size()} needed for quorum.")
+            logger.info(
+                f"Node {node.node_id} (candidate) received vote from {message.voter_id}: {self.votes_received}/{node._quorum_size()} needed for quorum."
+            )
             if self.votes_received >= node._quorum_size():
                 return node._become_leader()
 
         return []
-    
-    def _handle_message_request_vote(self, node: RaftNode, message: RequestVote) -> List[ElectionMessage]:
+
+    def _handle_message_request_vote(
+        self, node: RaftNode, message: RequestVote
+    ) -> List[ElectionMessage]:
         if message.term > node.current_term:
             node._become_follower(term=message.term)
             return node.handle_message(message)
@@ -189,8 +202,10 @@ class _CandidateBehavior(_RoleBehavior):
                 receiver=message.sender,
             )
         ]
-    
-    def _handle_message_append_entries(self, node: RaftNode, message: AppendEntries) -> List[ElectionMessage]:
+
+    def _handle_message_append_entries(
+        self, node: RaftNode, message: AppendEntries
+    ) -> List[ElectionMessage]:
         if message.term >= node.current_term:
             node._become_follower(term=message.term)
             return node.handle_message(message)
@@ -249,8 +264,10 @@ class _LeaderBehavior(_RoleBehavior):
             ]
 
         return []
-    
-    def _handle_message_request_vote(self, node: RaftNode, message: RequestVote) -> List[ElectionMessage]:
+
+    def _handle_message_request_vote(
+        self, node: RaftNode, message: RequestVote
+    ) -> List[ElectionMessage]:
         if message.term > node.current_term:
             node._become_follower(term=message.term)
             return node.handle_message(message)
@@ -264,8 +281,10 @@ class _LeaderBehavior(_RoleBehavior):
                 receiver=message.sender,
             )
         ]
-    
-    def _handle_message_append_entries(self, node: RaftNode, message: AppendEntries) -> List[ElectionMessage]:
+
+    def _handle_message_append_entries(
+        self, node: RaftNode, message: AppendEntries
+    ) -> List[ElectionMessage]:
         if message.term > node.current_term:
             node._become_follower(term=message.term)
             return node.handle_message(message)
@@ -280,8 +299,10 @@ class _LeaderBehavior(_RoleBehavior):
                 receiver=message.sender,
             )
         ]
-    
-    def _handle_message_append_entries_response(self, node: RaftNode, message: AppendEntriesResponse) -> List[ElectionMessage]:
+
+    def _handle_message_append_entries_response(
+        self, node: RaftNode, message: AppendEntriesResponse
+    ) -> List[ElectionMessage]:
         if message.term > node.current_term:
             node._become_follower(term=message.term)
             return []
@@ -337,7 +358,9 @@ class RaftNode:
     def handle_message(self, message: ElectionMessage) -> List[ElectionMessage]:
         """Dispatch an incoming election message to the current role behavior."""
         logger = logging.getLogger()
-        logger.info(f"Node {self.node_id} received from {getattr(message, 'sender', '?')}: {message}")
+        logger.info(
+            f"Node {self.node_id} received from {getattr(message, 'sender', '?')}: {message}"
+        )
         messages = self._behavior.handle_message(self, message)
         if messages:
             for msg in messages:
@@ -346,7 +369,9 @@ class RaftNode:
 
     def _transition_to(self, behavior: _RoleBehavior) -> None:
         logger = logging.getLogger()
-        logger.info(f"Node {self.node_id} transitions from {self.state.value} to {behavior.role.value} (term {self.current_term})")
+        logger.info(
+            f"Node {self.node_id} transitions from {self.state.value} to {behavior.role.value} (term {self.current_term})"
+        )
         self._behavior = behavior
         self.state = behavior.role
 
@@ -396,7 +421,9 @@ class RaftNode:
             last_heartbeat_sent_ms=self.current_time_ms,
         )
         # When sending initial AppendEntries, update last_heartbeat_sent_ms to current_time_ms + heartbeat_interval
-        leader_behavior.last_heartbeat_sent_ms = self.current_time_ms + heartbeat_interval
+        leader_behavior.last_heartbeat_sent_ms = (
+            self.current_time_ms + heartbeat_interval
+        )
         self._transition_to(leader_behavior)
         # Send initial AppendEntries to all other nodes as heartbeat
         return [
