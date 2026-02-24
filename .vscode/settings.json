@@ -4,6 +4,7 @@
         "/^python -m src\\.simulation$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "/home/morten/repos/DSRV_leader_election/.venv/bin/python": true
     }
 }
