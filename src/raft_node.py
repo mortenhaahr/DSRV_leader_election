@@ -62,6 +62,8 @@ class _FollowerBehavior(_RoleBehavior):
                     term=node.current_term,
                     voter_id=node.node_id,
                     vote_granted=False,
+                    sender=node.node_id,
+                    receiver=message.sender,
                 )
             ]
 
@@ -80,6 +82,8 @@ class _FollowerBehavior(_RoleBehavior):
                 term=node.current_term,
                 voter_id=node.node_id,
                 vote_granted=grant_vote,
+                sender=node.node_id,
+                receiver=message.sender,
             )
         ]
 
@@ -90,6 +94,8 @@ class _FollowerBehavior(_RoleBehavior):
                     term=node.current_term,
                     follower_id=node.node_id,
                     success=False,
+                    sender=node.node_id,
+                    receiver=message.sender,
                 )
             ]
 
@@ -104,6 +110,8 @@ class _FollowerBehavior(_RoleBehavior):
                 term=node.current_term,
                 follower_id=node.node_id,
                 success=True,
+                sender=node.node_id,
+                receiver=message.sender,
             )
         ]
 
@@ -158,7 +166,17 @@ class _CandidateBehavior(_RoleBehavior):
             self.votes_from.add(message.voter_id)
             self.votes_received += 1
             if self.votes_received >= node._quorum_size():
-                return node._become_leader()
+                # Leader sends AppendEntries to all other nodes
+                return [
+                    AppendEntries(
+                        term=node.current_term,
+                        leader_id=node.node_id,
+                        sender=node.node_id,
+                        receiver=other_id,
+                    )
+                    for other_id in range(node.cluster_size)
+                    if other_id != node.node_id
+                ]
 
         return []
     
@@ -172,6 +190,8 @@ class _CandidateBehavior(_RoleBehavior):
                 term=node.current_term,
                 voter_id=node.node_id,
                 vote_granted=False,
+                sender=node.node_id,
+                receiver=message.sender,
             )
         ]
     
@@ -185,6 +205,8 @@ class _CandidateBehavior(_RoleBehavior):
                 term=node.current_term,
                 follower_id=node.node_id,
                 success=False,
+                sender=node.node_id,
+                receiver=message.sender,
             )
         ]
 
@@ -218,7 +240,17 @@ class _LeaderBehavior(_RoleBehavior):
             >= self.heartbeat_interval_ms
         ):
             self.last_heartbeat_sent_ms = node.current_time_ms
-            return [AppendEntries(term=node.current_term, leader_id=node.node_id)]
+            # Send AppendEntries to all other nodes
+            return [
+                AppendEntries(
+                    term=node.current_term,
+                    leader_id=node.node_id,
+                    sender=node.node_id,
+                    receiver=other_id,
+                )
+                for other_id in range(node.cluster_size)
+                if other_id != node.node_id
+            ]
 
         return []
     
@@ -232,6 +264,8 @@ class _LeaderBehavior(_RoleBehavior):
                 term=node.current_term,
                 voter_id=node.node_id,
                 vote_granted=False,
+                sender=node.node_id,
+                receiver=message.sender,
             )
         ]
     
@@ -245,6 +279,8 @@ class _LeaderBehavior(_RoleBehavior):
                 term=node.current_term,
                 follower_id=node.node_id,
                 success=False,
+                sender=node.node_id,
+                receiver=message.sender,
             )
         ]
     
@@ -331,7 +367,17 @@ class RaftNode:
                 votes_from={self.node_id},
             )
         )
-        return [RequestVote(term=self.current_term, candidate_id=self.node_id)]
+        # Send RequestVote to all other nodes
+        return [
+            RequestVote(
+                term=self.current_term,
+                candidate_id=self.node_id,
+                sender=self.node_id,
+                receiver=other_id,
+            )
+            for other_id in range(self.cluster_size)
+            if other_id != self.node_id
+        ]
 
     def _become_leader(self) -> List[ElectionMessage]:
         self._transition_to(
@@ -340,4 +386,14 @@ class RaftNode:
                 last_heartbeat_sent_ms=self.current_time_ms,
             )
         )
-        return [AppendEntries(term=self.current_term, leader_id=self.node_id)]
+        # Send AppendEntries to all other nodes
+        return [
+            AppendEntries(
+                term=self.current_term,
+                leader_id=self.node_id,
+                sender=self.node_id,
+                receiver=other_id,
+            )
+            for other_id in range(self.cluster_size)
+            if other_id != self.node_id
+        ]
