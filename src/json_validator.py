@@ -8,11 +8,19 @@ from jsonschema import Draft202012Validator
 FILTER_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://example.local/filter.schema.json",
-    "title": "Composable filter config",
-    "$ref": "#/$defs/filter",
+    "title": "Simulation config",
+    "$ref": "#/$defs/sim_config",
     "$defs": {
+        "sim_config": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["filter"],
+            "properties": {
+                "duration_s": {"type": "number", "exclusiveMinimum": 0},
+                "filter": {"$ref": "#/$defs/filter"},
+            },
+        },
         "filter": {
-            # tagged union on "type"
             "oneOf": [
                 {"$ref": "#/$defs/timed"},
                 {"$ref": "#/$defs/sender"},
@@ -91,7 +99,6 @@ FILTER_SCHEMA: dict[str, Any] = {
         },
     },
 }
-
 
 _validator = Draft202012Validator(FILTER_SCHEMA)
 
