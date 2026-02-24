@@ -13,10 +13,18 @@ from src.filters import (
 
 
 class Simulation:
-    def run(self, seed: int, num_nodes: int) -> None:
+    def __init__(self, seed: int, num_nodes: int, duration_s: float, tick_ms: int):
+        self.seed = seed
+        self.num_nodes = num_nodes
+        self.duration_s = duration_s
+        self.tick_ms = tick_ms
+
+    def run(self) -> None:
         logging, tick_filter = configure_logging()
+        seed = self.seed
+        num_nodes = self.num_nodes
         nodes = [RaftNode(node_id=i, seed=seed + i) for i in range(num_nodes)]
-        tick_inc = 1
+        tick_ms = self.tick_ms
         scheduler = MessageScheduler()
         filters = [
             GeneralLatencyFilter(delay_distribution=(2, 10), seed=seed + 1),
@@ -26,7 +34,7 @@ class Simulation:
             scheduler.add_filter(f)
 
         next_tick_messages = []
-        for tick in range(0, 500, tick_inc):
+        for tick in range(0, 500, tick_ms):
             tick_filter.set_tick(tick)
 
             if tick == 200:
