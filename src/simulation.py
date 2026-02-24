@@ -13,28 +13,42 @@ from src.filters import (
 
 
 class Simulation:
-    def __init__(self, seed: int, num_nodes: int, duration_s: float, tick_ms: int):
+    def __init__(
+        self,
+        seed: int,
+        num_nodes: int,
+        duration_s: float,
+        tick_ms: int,
+        node_timeout_limits: tuple[int, int],
+    ):
         self.seed = seed
         self.num_nodes = num_nodes
         self.duration_s = duration_s
         self.tick_ms = tick_ms
+        self.node_timeout_range = node_timeout_limits
 
     def run(self) -> None:
         logging, tick_filter = configure_logging()
-        seed = self.seed
-        num_nodes = self.num_nodes
-        nodes = [RaftNode(node_id=i, seed=seed + i) for i in range(num_nodes)]
+        nodes = [
+            RaftNode(
+                node_id=i,
+                seed=self.seed + i,
+                deadline_range=self.node_timeout_range,
+                cluster_size=self.num_nodes,
+            )
+            for i in range(self.num_nodes)
+        ]
         tick_ms = self.tick_ms
         scheduler = MessageScheduler()
         filters = [
-            GeneralLatencyFilter(delay_distribution=(2, 10), seed=seed + 1),
-            # NodeLatencyFilter(node_id=0, delay_distribution=(30, 100), seed=seed + 2),
+            GeneralLatencyFilter(delay_distribution=(2, 10), seed=self.seed + 1),
+            # NodeLatencyFilter(node_id=0, delay_distribution=(30, 100), seed=self.seed + 2),
         ]
         for f in filters:
             scheduler.add_filter(f)
 
         next_tick_messages = []
-        for tick in range(0, 500, tick_ms):
+        for tick in range(0, int(self.duration_s * 1000), tick_ms):
             tick_filter.set_tick(tick)
 
             if tick == 200:

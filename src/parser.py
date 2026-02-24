@@ -24,7 +24,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument("--duration-s", type=positive_float, default=2.0)
+    parser.add_argument("--duration-s", type=positive_float, default=0.5)
     parser.add_argument("--num-nodes", type=positive_int, default=3)
     parser.add_argument("--tick-ms", type=positive_int, default=1)
     parser.add_argument("--heartbeat-interval-ms", type=positive_float, default=20.0)

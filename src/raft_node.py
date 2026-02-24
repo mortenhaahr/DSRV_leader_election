@@ -330,8 +330,8 @@ class RaftNode:
         self,
         node_id: int,
         seed: int,
-        deadline_range: tuple[int, int] = (150, 300),
-        cluster_size: int = 3,
+        deadline_range: tuple[int, int],
+        cluster_size: int,
     ):
         self.node_id = node_id
         self.cluster_size = cluster_size
