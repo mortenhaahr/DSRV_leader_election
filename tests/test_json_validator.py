@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from jsonschema.exceptions import ValidationError
 
 from src.json_parser import validate_filter_config
 
@@ -155,6 +156,42 @@ class JsonValidatorTest(unittest.TestCase):
         for i, config in enumerate(valid_configs):
             with self.subTest(i=i):
                 validate_filter_config(config)
+
+    def test_validate_filter_config_invalid(self) -> None:
+        """Ensure invalid filter configs are rejected by the schema."""
+        invalid_configs = [
+            # 1) Missing required top-level "filters"
+            {},
+            # 2) duration_s must be > 0
+            {"duration_s": 0, "filters": []},
+            # 3) num_nodes must be >= 1
+            {"num_nodes": 0, "filters": []},
+            # 4) tick_ms must be >= 1
+            {"tick_ms": 0, "filters": []},
+            # 5) heartbeat_interval_ms must be > 0
+            {"heartbeat_interval_ms": 0.0, "filters": []},
+            # 6) seed must be an integer (schema disallows null/float/string)
+            {"seed": None, "filters": []},
+            # 7) log_level must be one of the enum values
+            {"log_level": "debug", "filters": []},
+            # 8) node_timeout_range_ms must be exactly two ints
+            {"node_timeout_range_ms": [150], "filters": []},
+            # 9) additionalProperties=false at top level (unknown key)
+            {"filters": [], "unknown": 123},
+            # 10) filter item missing required field ("type")
+            {"filters": [{}]},
+            # 11) timed missing inner
+            {"filters": [{"type": "timed", "start_tick": 0, "duration": 1}]},
+            # 12) latency delay_ms wrong length
+            {"filters": [{"type": "latency", "delay_ms": [1, 2, 3]}]},
+            # 13) sender_receiver missing node_id
+            {"filters": [{"type": "sender_receiver", "inner": {"type": "crash"}}]},
+        ]
+
+        for i, config in enumerate(invalid_configs):
+            with self.subTest(i=i):
+                with self.assertRaises(ValidationError):
+                    validate_filter_config(config)
 
 
 if __name__ == "__main__":
