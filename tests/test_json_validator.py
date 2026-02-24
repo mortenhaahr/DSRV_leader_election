@@ -112,6 +112,45 @@ class JsonValidatorTest(unittest.TestCase):
                 ]
             },
         ]
+        # Mainly sim_config:
+        valid_configs += [
+            # 12) Validate num_nodes / tick_ms / heartbeat_interval_ms
+            {
+                "num_nodes": 5,
+                "tick_ms": 2,
+                "heartbeat_interval_ms": 25.0,
+                "filters": [],
+            },
+            # 13) Validate seed (int) + empty filters
+            {
+                "seed": 123456,
+                "filters": [],
+            },
+            # 14) Validate log_level enum
+            {
+                "log_level": "DEBUG",
+                "filters": [],
+            },
+            # 15) Validate node_timeout_range_ms fixed-length tuple
+            {
+                "node_timeout_range_ms": [150, 300],
+                "filters": [],
+            },
+            # 16) Validate everything together + multiple filters
+            {
+                "duration_s": 1.0,
+                "num_nodes": 7,
+                "tick_ms": 1,
+                "heartbeat_interval_ms": 10.0,
+                "seed": 42,
+                "log_level": "WARNING",
+                "node_timeout_range_ms": [10, 20],
+                "filters": [
+                    {"type": "crash"},
+                    {"type": "latency", "delay_ms": [5, 15]},
+                ],
+            },
+        ]
 
         for i, config in enumerate(valid_configs):
             with self.subTest(i=i):

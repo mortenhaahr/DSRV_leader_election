@@ -4,6 +4,8 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from src.log_config import LOG_LEVELS
+
 FILTER_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://example.local/filter.schema.json",
@@ -15,7 +17,28 @@ FILTER_SCHEMA: dict[str, Any] = {
             "additionalProperties": False,
             "required": ["filters"],
             "properties": {
-                "duration_s": {"type": "number", "exclusiveMinimum": 0},
+                "duration_s": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                },
+                "num_nodes": {"type": "integer", "minimum": 1},
+                "tick_ms": {"type": "integer", "minimum": 1},
+                "heartbeat_interval_ms": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                },
+                "seed": {"type": ["integer"]},
+                "log_level": {"type": "string", "enum": list(LOG_LEVELS)},
+                "node_timeout_range_ms": {
+                    "type": "array",
+                    "prefixItems": [
+                        {"type": "integer", "minimum": 1},
+                        {"type": "integer", "minimum": 1},
+                    ],
+                    "items": False,
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
                 "filters": {
                     "type": "array",
                     "items": {"$ref": "#/$defs/filter"},
