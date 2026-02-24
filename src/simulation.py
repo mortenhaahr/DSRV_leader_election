@@ -4,8 +4,8 @@ import random
 
 from src.log_config import configure_logging
 from src.raft_node import RaftNode, Role
-from src.message_scheduler import (
-    MessageScheduler,
+from src.message_scheduler import MessageScheduler
+from src.filters import (
     GeneralLatencyFilter,
     NodeLatencyFilter,
     CrashFilter,
