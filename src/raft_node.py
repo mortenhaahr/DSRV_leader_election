@@ -166,17 +166,7 @@ class _CandidateBehavior(_RoleBehavior):
             self.votes_from.add(message.voter_id)
             self.votes_received += 1
             if self.votes_received >= node._quorum_size():
-                # Leader sends AppendEntries to all other nodes as heartbeat
-                return [
-                    AppendEntries(
-                        term=node.current_term,
-                        leader_id=node.node_id,
-                        sender=node.node_id,
-                        receiver=other_id,
-                    )
-                    for other_id in range(node.cluster_size)
-                    if other_id != node.node_id
-                ]
+                return node._become_leader()
 
         return []
     
@@ -382,12 +372,14 @@ class RaftNode:
         ]
 
     def _become_leader(self) -> List[ElectionMessage]:
-        self._transition_to(
-            _LeaderBehavior(
-                heartbeat_interval_ms=max(50, self.deadline_range[0] // 2),
-                last_heartbeat_sent_ms=self.current_time_ms,
-            )
+        heartbeat_interval = max(50, self.deadline_range[0] // 2)
+        leader_behavior = _LeaderBehavior(
+            heartbeat_interval_ms=heartbeat_interval,
+            last_heartbeat_sent_ms=self.current_time_ms,
         )
+        # When sending initial AppendEntries, update last_heartbeat_sent_ms to current_time_ms + heartbeat_interval
+        leader_behavior.last_heartbeat_sent_ms = self.current_time_ms + heartbeat_interval
+        self._transition_to(leader_behavior)
         # Send initial AppendEntries to all other nodes as heartbeat
         return [
             AppendEntries(
