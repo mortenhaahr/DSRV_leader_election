@@ -4,30 +4,30 @@ import random
 from src.log_config import LOG_LEVELS
 
 
-def positive_float(x: str) -> float:
+def _positive_float(x: str) -> float:
     v = float(x)
     if v <= 0:
         raise argparse.ArgumentTypeError("must be > 0.0")
     return v
 
 
-def positive_int(s: str) -> int:
+def _positive_int(s: str) -> int:
     v = int(s)
     if v <= 0:
         raise argparse.ArgumentTypeError("must be > 0")
     return v
 
 
-def parse_args() -> argparse.Namespace:
+def cli_parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="RAFT leader-election simulation.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument("--duration-s", type=positive_float, default=0.5)
-    parser.add_argument("--num-nodes", type=positive_int, default=3)
-    parser.add_argument("--tick-ms", type=positive_int, default=1)
-    parser.add_argument("--heartbeat-interval-ms", type=positive_float, default=20.0)
+    parser.add_argument("--duration-s", type=_positive_float, default=0.5)
+    parser.add_argument("--num-nodes", type=_positive_int, default=3)
+    parser.add_argument("--tick-ms", type=_positive_int, default=1)
+    parser.add_argument("--heartbeat-interval-ms", type=_positive_float, default=20.0)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
         "--log-level",
@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--node-timeout-range-ms",
         metavar=("START", "END"),
-        type=positive_int,
+        type=_positive_int,
         nargs=2,
         default=(150, 300),
         help="Range for random election timeout intervals in milliseconds (default: 150 300)",
