@@ -12,11 +12,20 @@ from typing import Literal, Union
 class ElectionMessage:
     """
     Base class for all election-related messages in the Raft protocol.
+    Adds a unique message_id to each message.
     """
 
-    def __init__(self, sender: int, receiver: int):
+    _id_counter = 0
+
+    @classmethod
+    def next_id(cls) -> int:
+        cls._id_counter += 1
+        return cls._id_counter
+
+    def __init__(self, sender: int, receiver: int, message_id: int | None = None):
         self.sender = sender
         self.receiver = receiver
+        self.message_id = message_id if message_id is not None else self.next_id()
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +38,7 @@ class RequestVote(ElectionMessage):
     candidate_id: int
     sender: int
     receiver: int
+    message_id: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +52,7 @@ class RequestVoteResponse(ElectionMessage):
     vote_granted: bool
     sender: int
     receiver: int
+    message_id: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +67,7 @@ class AppendEntries(ElectionMessage):
     leader_id: int
     sender: int
     receiver: int
+    message_id: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +82,7 @@ class AppendEntriesResponse(ElectionMessage):
     success: bool
     sender: int
     receiver: int
+    message_id: int = 0
 
 
 # -------------
