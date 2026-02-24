@@ -70,7 +70,6 @@ class _FollowerBehavior(_RoleBehavior):
                     vote_granted=False,
                     sender=node.node_id,
                     receiver=message.sender,
-                    message_id=ElectionMessage.next_id(),
                 )
             ]
 
@@ -91,7 +90,6 @@ class _FollowerBehavior(_RoleBehavior):
                 vote_granted=grant_vote,
                 sender=node.node_id,
                 receiver=message.sender,
-                message_id=ElectionMessage.next_id(),
             )
         ]
 
@@ -106,7 +104,6 @@ class _FollowerBehavior(_RoleBehavior):
                     success=False,
                     sender=node.node_id,
                     receiver=message.sender,
-                    message_id=ElectionMessage.next_id(),
                 )
             ]
 
@@ -123,7 +120,6 @@ class _FollowerBehavior(_RoleBehavior):
                 success=True,
                 sender=node.node_id,
                 receiver=message.sender,
-                message_id=ElectionMessage.next_id(),
             )
         ]
 
@@ -204,7 +200,6 @@ class _CandidateBehavior(_RoleBehavior):
                 vote_granted=False,
                 sender=node.node_id,
                 receiver=message.sender,
-                message_id=ElectionMessage.next_id(),
             )
         ]
 
@@ -223,7 +218,6 @@ class _CandidateBehavior(_RoleBehavior):
                 success=False,
                 sender=node.node_id,
                 receiver=message.sender,
-                message_id=ElectionMessage.next_id(),
             )
         ]
 
@@ -285,7 +279,6 @@ class _LeaderBehavior(_RoleBehavior):
                 vote_granted=False,
                 sender=node.node_id,
                 receiver=message.sender,
-                message_id=ElectionMessage.next_id(),
             )
         ]
 
@@ -304,7 +297,6 @@ class _LeaderBehavior(_RoleBehavior):
                 success=False,
                 sender=node.node_id,
                 receiver=message.sender,
-                message_id=ElectionMessage.next_id(),
             )
         ]
 
@@ -417,7 +409,6 @@ class RaftNode:
                 candidate_id=self.node_id,
                 sender=self.node_id,
                 receiver=other_id,
-                message_id=ElectionMessage.next_id(),
             )
             for other_id in range(self.cluster_size)
             if other_id != self.node_id
@@ -441,7 +432,6 @@ class RaftNode:
                 leader_id=self.node_id,
                 sender=self.node_id,
                 receiver=other_id,
-                message_id=ElectionMessage.next_id(),
             )
             for other_id in range(self.cluster_size)
             if other_id != self.node_id

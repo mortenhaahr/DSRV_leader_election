@@ -12,7 +12,7 @@ from typing import Literal, Union
 class ElectionMessage:
     """
     Base class for all election-related messages in the Raft protocol.
-    Adds a unique message_id to each message.
+    Adds a unique msg_id to each message.
     """
 
     _id_counter = 0
@@ -22,10 +22,10 @@ class ElectionMessage:
         cls._id_counter += 1
         return cls._id_counter
 
-    def __init__(self, sender: int, receiver: int, message_id: int | None = None):
+    def __init__(self, sender: int, receiver: int, msg_id: int | None = None):
         self.sender = sender
         self.receiver = receiver
-        self.message_id = message_id if message_id is not None else self.next_id()
+        self.msg_id = msg_id if msg_id is not None else self.next_id()
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,7 +38,12 @@ class RequestVote(ElectionMessage):
     candidate_id: int
     sender: int
     receiver: int
-    message_id: int = 0
+    msg_id: int | None = None
+
+    def __post_init__(self):
+        # Bypass frozen to set msg_id if not provided
+        if self.msg_id is None:
+            object.__setattr__(self, "msg_id", ElectionMessage.next_id())
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +57,11 @@ class RequestVoteResponse(ElectionMessage):
     vote_granted: bool
     sender: int
     receiver: int
-    message_id: int = 0
+    msg_id: int | None = None
+
+    def __post_init__(self):
+        if self.msg_id is None:
+            object.__setattr__(self, "msg_id", ElectionMessage.next_id())
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +76,11 @@ class AppendEntries(ElectionMessage):
     leader_id: int
     sender: int
     receiver: int
-    message_id: int = 0
+    msg_id: int | None = None
+
+    def __post_init__(self):
+        if self.msg_id is None:
+            object.__setattr__(self, "msg_id", ElectionMessage.next_id())
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,41 +95,8 @@ class AppendEntriesResponse(ElectionMessage):
     success: bool
     sender: int
     receiver: int
-    message_id: int = 0
+    msg_id: int | None = None
 
-
-# -------------
-# Event messages
-# -------------
-
-
-@dataclass(frozen=True, slots=True)
-class FailureEvent:
-    """
-    Simulation event to indicate a node crash or recovery.
-    Not part of the Raft protocol, but used for testing fault tolerance.
-    """
-
-    action: Literal["crash", "recover"]
-
-
-@dataclass(frozen=True, slots=True)
-class ClockTickEvent:
-    """
-    Simulation event to advance the logical clock and trigger node ticks.
-    Not part of the Raft protocol, but used to drive the simulation.
-    """
-
-    action: Literal["tick"]
-    sim_tick: int
-    sim_time_s: float
-
-
-AnyMessage = Union[
-    RequestVote,
-    RequestVoteResponse,
-    AppendEntries,
-    AppendEntriesResponse,
-    FailureEvent,
-    ClockTickEvent,
-]
+    def __post_init__(self):
+        if self.msg_id is None:
+            object.__setattr__(self, "msg_id", ElectionMessage.next_id())
