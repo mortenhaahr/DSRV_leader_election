@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from enum import Enum
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 import random
 
 from src.messages import ElectionMessage
+from src.simulation_state import SimulationState
 
 
 # Should propably live in message_scheduler.py, but this avoids recursive imports
@@ -21,6 +24,57 @@ def prioritize_actions(actions: list[ScheduleAction]) -> ScheduleAction:
 
 class Filter(Protocol):
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction: ...
+
+
+@runtime_checkable
+class StatefulFilter(Filter, Protocol):
+    def set_sim_state(self, sim_state: SimulationState) -> None: ...
+
+
+class LeaderSenderFilter(StatefulFilter):
+    def __init__(self, inner: Filter):
+        self.leader_id: int | None = None
+        self.inner = inner
+
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
+        if self.leader_id is not None and message.sender == self.leader_id:
+            return ScheduleAction.DROP
+        else:
+            return self.inner.filter(message, current_tick)
+
+    def set_sim_state(self, sim_state: SimulationState) -> None:
+        self.leader_id = sim_state.leader_id
+
+
+class LeaderReceiverFilter(StatefulFilter):
+    def __init__(self, inner: Filter):
+        self.leader_id: int | None = None
+        self.inner = inner
+
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
+        if self.leader_id is not None and message.receiver == self.leader_id:
+            return ScheduleAction.DROP
+        else:
+            return self.inner.filter(message, current_tick)
+
+    def set_sim_state(self, sim_state: SimulationState) -> None:
+        self.leader_id = sim_state.leader_id
+
+
+class LeaderSenderReceiverFilter(StatefulFilter):
+    def __init__(self, inner: Filter):
+        self.leader_id: int | None = None
+        self.sender_filter = LeaderSenderFilter(inner)
+        self.receiver_filter = LeaderReceiverFilter(inner)
+
+    def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
+        sender_action = self.sender_filter.filter(message, current_tick)
+        receiver_action = self.receiver_filter.filter(message, current_tick)
+        return prioritize_actions([sender_action, receiver_action])
+
+    def set_sim_state(self, sim_state: SimulationState) -> None:
+        self.sender_filter.set_sim_state(sim_state)
+        self.receiver_filter.set_sim_state(sim_state)
 
 
 class TimedFilter:

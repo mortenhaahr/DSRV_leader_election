@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-
 from src.filters import Filter
 from src.log_config import set_tick_time
 from src.message_scheduler import MessageScheduler
-from src.raft_node import RaftNode
+from src.raft_node import RaftNode, Role
+from src.simulation_state import SimulationState
 
 
 class Simulation:
@@ -56,6 +56,14 @@ class Simulation:
             for node in nodes:
                 outgoing = node.handle_tick(tick_time_ms=tick)
                 scheduler.schedule_messages(outgoing)
+
+            leader_id = None
+            for node in nodes:
+                if node.state == Role.LEADER:
+                    leader_id = node.node_id
+                    break
+            sim_state = SimulationState(leader_id=leader_id)
+            scheduler.update_state(sim_state)
 
             # Deliver all messages scheduled for this tick
             to_deliver = scheduler.deliver_messages(tick)
