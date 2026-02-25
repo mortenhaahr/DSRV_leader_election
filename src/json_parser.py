@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from jsonschema.exceptions import ValidationError
-from dataclasses import dataclass
 
 from src.filters import (
     Filter,

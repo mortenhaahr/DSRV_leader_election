@@ -46,6 +46,13 @@ def cli_parse_args() -> argparse.Namespace:
         help="Range for random election timeout intervals in milliseconds (default: 150 300)",
     )
 
+    parser.add_argument(
+        "--json",
+        type=str,
+        default=None,
+        help="Path to JSON configuration file",
+    )
+
     args = parser.parse_args()
 
     start, end = args.node_timeout_range_ms
