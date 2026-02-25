@@ -9,6 +9,9 @@ from src.filters import (
     SenderFilter,
     ReceiverFilter,
     SenderReceiverFilter,
+    LeaderSenderFilter,
+    LeaderReceiverFilter,
+    LeaderSenderReceiverFilter,
     LatencyFilter,
     CrashFilter,
 )
@@ -61,6 +64,18 @@ def parse_filters(filters_spec: list[dict[str, Any]], seed: int = 0) -> list[Fil
                 inner=inner,
                 node_id=spec["node_id"],
             )
+
+        if t == "leader_sender":
+            inner = parse_one_filter(spec["inner"])
+            return LeaderSenderFilter(inner=inner)
+
+        if t == "leader_receiver":
+            inner = parse_one_filter(spec["inner"])
+            return LeaderReceiverFilter(inner=inner)
+
+        if t == "leader_msg":
+            inner = parse_one_filter(spec["inner"])
+            return LeaderSenderReceiverFilter(inner=inner)
 
         if t == "latency":
             lo, hi = spec["delay_ms"]

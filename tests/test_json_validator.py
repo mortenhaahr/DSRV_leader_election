@@ -112,32 +112,64 @@ class JsonValidatorTest(unittest.TestCase):
                     {"type": "latency", "delay_ms": [5, 15]},
                 ]
             },
+            # 12) leader_sender -> latency
+            {
+                "filters": [
+                    {
+                        "type": "leader_sender",
+                        "inner": {"type": "latency", "delay_ms": [1, 2]},
+                    }
+                ]
+            },
+            # 13) leader_receiver -> crash
+            {
+                "filters": [
+                    {
+                        "type": "leader_receiver",
+                        "inner": {"type": "crash"},
+                    }
+                ]
+            },
+            # 14) leader_msg -> timed -> latency
+            {
+                "filters": [
+                    {
+                        "type": "leader_msg",
+                        "inner": {
+                            "type": "timed",
+                            "start_tick": 5,
+                            "duration": 10,
+                            "inner": {"type": "latency", "delay_ms": [0, 1]},
+                        },
+                    }
+                ]
+            },
         ]
         # Mainly sim_config:
         valid_configs += [
-            # 12) Validate num_nodes / tick_ms / heartbeat_interval_ms
+            # 15) Validate num_nodes / tick_ms / heartbeat_interval_ms
             {
                 "num_nodes": 5,
                 "tick_ms": 2,
                 "heartbeat_interval_ms": 25.0,
                 "filters": [],
             },
-            # 13) Validate seed (int) + empty filters
+            # 16) Validate seed (int) + empty filters
             {
                 "seed": 123456,
                 "filters": [],
             },
-            # 14) Validate log_level enum
+            # 17) Validate log_level enum
             {
                 "log_level": "DEBUG",
                 "filters": [],
             },
-            # 15) Validate node_timeout_range_ms fixed-length tuple
+            # 18) Validate node_timeout_range_ms fixed-length tuple
             {
                 "node_timeout_range_ms": [150, 300],
                 "filters": [],
             },
-            # 16) Validate everything together + multiple filters
+            # 19) Validate everything together + multiple filters
             {
                 "duration_s": 1.0,
                 "num_nodes": 7,
@@ -186,6 +218,8 @@ class JsonValidatorTest(unittest.TestCase):
             {"filters": [{"type": "latency", "delay_ms": [1, 2, 3]}]},
             # 13) sender_receiver missing node_id
             {"filters": [{"type": "sender_receiver", "inner": {"type": "crash"}}]},
+            # 14) leader_msg missing inner
+            {"filters": [{"type": "leader_msg"}]},
         ]
 
         for i, config in enumerate(invalid_configs):

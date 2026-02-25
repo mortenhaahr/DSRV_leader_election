@@ -112,6 +112,38 @@ class JsonParserTest(unittest.TestCase):
                     {"type": "latency", "delay_ms": [5, 15]},
                 ]
             },
+            # 12) leader_sender -> latency
+            {
+                "filters": [
+                    {
+                        "type": "leader_sender",
+                        "inner": {"type": "latency", "delay_ms": [1, 2]},
+                    }
+                ]
+            },
+            # 13) leader_receiver -> crash
+            {
+                "filters": [
+                    {
+                        "type": "leader_receiver",
+                        "inner": {"type": "crash"},
+                    }
+                ]
+            },
+            # 14) leader_msg -> timed -> latency
+            {
+                "filters": [
+                    {
+                        "type": "leader_msg",
+                        "inner": {
+                            "type": "timed",
+                            "start_tick": 5,
+                            "duration": 10,
+                            "inner": {"type": "latency", "delay_ms": [0, 1]},
+                        },
+                    }
+                ]
+            },
             # 12) Validate num_nodes / tick_ms / heartbeat_interval_ms
             {
                 "num_nodes": 5,
@@ -186,6 +218,8 @@ class JsonParserTest(unittest.TestCase):
             {"filters": [{"type": "latency", "delay_ms": [1, 2, 3]}]},
             # 13) sender_receiver missing node_id
             {"filters": [{"type": "sender_receiver", "inner": {"type": "crash"}}]},
+            # 14) leader_msg missing inner
+            {"filters": [{"type": "leader_msg"}]},
         ]
         for i, config in enumerate(invalid_configs):
             with self.subTest(i=i):

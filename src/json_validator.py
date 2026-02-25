@@ -8,7 +8,17 @@ from src.log_config import LOG_LEVELS
 class ValidationError(ValueError):
     pass
 
-_FILTER_TYPES = {"timed", "sender", "receiver", "sender_receiver", "latency", "crash"}
+_FILTER_TYPES = {
+    "timed",
+    "sender",
+    "receiver",
+    "sender_receiver",
+    "leader_sender",
+    "leader_receiver",
+    "leader_msg",
+    "latency",
+    "crash",
+}
 
 
 def _is_int(value: Any) -> bool:
@@ -117,6 +127,21 @@ def _validate_filter(obj: Any, path: str) -> None:
     if filter_type == "sender_receiver":
         _check_keys(filter_obj, path, required={"type", "node_id", "inner"})
         _expect_int(filter_obj["node_id"], _path(path, "node_id"), min_value=0)
+        _validate_filter(filter_obj["inner"], _path(path, "inner"))
+        return
+
+    if filter_type == "leader_sender":
+        _check_keys(filter_obj, path, required={"type", "inner"})
+        _validate_filter(filter_obj["inner"], _path(path, "inner"))
+        return
+
+    if filter_type == "leader_receiver":
+        _check_keys(filter_obj, path, required={"type", "inner"})
+        _validate_filter(filter_obj["inner"], _path(path, "inner"))
+        return
+
+    if filter_type == "leader_msg":
+        _check_keys(filter_obj, path, required={"type", "inner"})
         _validate_filter(filter_obj["inner"], _path(path, "inner"))
         return
 
