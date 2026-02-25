@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import unittest
-from jsonschema.exceptions import ValidationError
+
 from src.json_parser import json_parse_config_dict
+from src.json_validator import ValidationError
 
 
 class JsonParserTest(unittest.TestCase):

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import unittest
-from jsonschema.exceptions import ValidationError
 
 from src.json_parser import validate_filter_config
+from src.json_validator import ValidationError
 
 
 class JsonValidatorTest(unittest.TestCase):

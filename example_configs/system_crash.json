@@ -1,0 +1,19 @@
+{
+  "duration_s": 0.5,
+  "num_nodes": 3,
+  "tick_ms": 1,
+  "heartbeat_interval_ms": 10.0,
+  "seed": 42,
+  "log_level": "INFO",
+  "node_timeout_range_ms": [150, 300],
+  "filters": [
+    {
+      "type": "timed",
+      "start_tick": 250,
+      "duration": 100,
+      "inner": {
+        "type": "crash"
+      }
+    }
+  ]
+}
