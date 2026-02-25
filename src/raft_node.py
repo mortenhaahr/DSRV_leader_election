@@ -331,6 +331,7 @@ class RaftNode:
         node_id: int,
         seed: int,
         deadline_range: tuple[int, int],
+        heartbeat_interval_ms: int,
         cluster_size: int,
     ):
         self.node_id = node_id
@@ -339,6 +340,7 @@ class RaftNode:
         self.current_time_ms = 0
         self.rng = random.Random(seed)
         self.deadline_range = deadline_range
+        self.heartbeat_interval_ms = heartbeat_interval_ms
         self._behavior: _RoleBehavior = _FollowerBehavior(
             last_heartbeat_ms=self.current_time_ms,
             next_deadline=self._draw_election_deadline(),
@@ -415,14 +417,13 @@ class RaftNode:
         ]
 
     def _become_leader(self) -> List[ElectionMessage]:
-        heartbeat_interval = max(50, self.deadline_range[0] // 2)
         leader_behavior = _LeaderBehavior(
-            heartbeat_interval_ms=heartbeat_interval,
+            heartbeat_interval_ms=self.heartbeat_interval_ms,
             last_heartbeat_sent_ms=self.current_time_ms,
         )
         # When sending initial AppendEntries, update last_heartbeat_sent_ms to current_time_ms + heartbeat_interval
         leader_behavior.last_heartbeat_sent_ms = (
-            self.current_time_ms + heartbeat_interval
+            self.current_time_ms + self.heartbeat_interval_ms
         )
         self._transition_to(leader_behavior)
         # Send initial AppendEntries to all other nodes as heartbeat

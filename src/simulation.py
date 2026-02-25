@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import logging
 
+from src.filters import Filter
 from src.log_config import set_tick_time
-from src.raft_node import RaftNode, Role
 from src.message_scheduler import MessageScheduler
-from src.filters import CrashFilter, SenderReceiverFilter, LatencyFilter, TimedFilter
+from src.raft_node import RaftNode
 
 
 class Simulation:
@@ -15,62 +14,38 @@ class Simulation:
         num_nodes: int,
         duration_s: float,
         tick_ms: int,
+        heartbeat_interval_ms: int,
         node_timeout_limits: tuple[int, int],
+        filters: list[Filter] | None = None,
     ):
         self.seed = seed
         self.num_nodes = num_nodes
         self.duration_s = duration_s
         self.tick_ms = tick_ms
+        self.heartbeat_interval_ms = heartbeat_interval_ms
         self.node_timeout_range = node_timeout_limits
+        self.filters = filters or []
 
     def run(self) -> None:
-        logger = logging.getLogger()
         nodes = [
             RaftNode(
                 node_id=i,
                 seed=self.seed + i,
                 deadline_range=self.node_timeout_range,
+                heartbeat_interval_ms=self.heartbeat_interval_ms,
                 cluster_size=self.num_nodes,
             )
             for i in range(self.num_nodes)
         ]
         tick_ms = self.tick_ms
         scheduler = MessageScheduler()
-        filters = [
-            LatencyFilter(
-                delay_distribution=(2, 10), seed=self.seed + 1
-            ),  # Overall latency
-            SenderReceiverFilter(
-                LatencyFilter(delay_distribution=(30, 100), seed=self.seed + 2),
-                node_id=0,
-            ),  # Higher latency for node 0
-        ]
+        filters = self.filters
         for f in filters:
             scheduler.add_filter(f)
 
         next_tick_messages = []
         for tick in range(0, int(self.duration_s * 1000), tick_ms):
             set_tick_time(tick)
-
-            if tick == 200:
-                leader_id = next(
-                    (node.node_id for node in nodes if node.state == Role.LEADER), None
-                )
-                if leader_id is not None:
-                    logging.info(
-                        f"Simulating crash of leader node {leader_id} at tick {tick}"
-                    )
-                    crash_filter = TimedFilter(
-                        SenderReceiverFilter(
-                            CrashFilter(),
-                            node_id=leader_id,
-                        ),
-                        start_tick=tick,
-                        duration=150,
-                    )
-                    scheduler.add_filter(crash_filter)
-                else:
-                    logging.warning(f"No leader found at tick {tick} to crash.")
 
             # Schedule messages generated in the previous tick
             if next_tick_messages:
