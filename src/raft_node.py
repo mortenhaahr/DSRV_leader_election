@@ -14,6 +14,7 @@ from src.messages import (
     RequestVote,
     RequestVoteResponse,
 )
+from src.log_config import DEBUG, INFO, log_message_event
 
 
 class Role(Enum):
@@ -165,8 +166,6 @@ class _CandidateBehavior(_RoleBehavior):
     def _handle_message_request_vote_response(
         self, node: RaftNode, message: RequestVoteResponse
     ) -> List[ElectionMessage]:
-        import logging
-
         if message.term > node.current_term:
             node._become_follower(term=message.term)
             return []
@@ -178,8 +177,13 @@ class _CandidateBehavior(_RoleBehavior):
             self.votes_from.add(message.voter_id)
             self.votes_received += 1
             logger = logging.getLogger()
-            logger.info(
-                f"Node {node.node_id} (candidate) received vote from {message.voter_id}: {self.votes_received}/{node._quorum_size()} needed for quorum."
+            logger.log(
+                INFO,
+                "node_event=vote_received node_id=%s voter_id=%s votes_received=%s quorum=%s",
+                node.node_id,
+                message.voter_id,
+                self.votes_received,
+                node._quorum_size(),
             )
             if self.votes_received >= node._quorum_size():
                 return node._become_leader()
@@ -352,27 +356,37 @@ class RaftNode:
         self.current_time_ms = tick_time_ms
         messages = self._behavior.handle_tick(self)
         if messages:
-            logger = logging.getLogger()
             for msg in messages:
-                logger.info(f"Node {self.node_id} sending: {msg}")
+                log_message_event(
+                    "generate",
+                    msg,
+                    node_id=self.node_id,
+                    level=DEBUG,
+                )
         return messages
 
     def handle_message(self, message: ElectionMessage) -> List[ElectionMessage]:
         """Dispatch an incoming election message to the current role behavior."""
-        logger = logging.getLogger()
-        logger.info(
-            f"Node {self.node_id} received from {getattr(message, 'sender', '?')}: {message}"
-        )
         messages = self._behavior.handle_message(self, message)
         if messages:
             for msg in messages:
-                logger.info(f"Node {self.node_id} sending: {msg}")
+                log_message_event(
+                    "generate",
+                    msg,
+                    node_id=self.node_id,
+                    level=DEBUG,
+                )
         return messages
 
     def _transition_to(self, behavior: _RoleBehavior) -> None:
         logger = logging.getLogger()
-        logger.info(
-            f"Node {self.node_id} transitions from {self.state.value} to {behavior.role.value} (term {self.current_term})"
+        logger.log(
+            INFO,
+            "node_event=transition node_id=%s from_role=%s to_role=%s term=%s",
+            self.node_id,
+            self.state.value,
+            behavior.role.value,
+            self.current_term,
         )
         self._behavior = behavior
         self.state = behavior.role

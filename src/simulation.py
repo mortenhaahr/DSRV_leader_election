@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.filters import Filter
+from src.log_config import log_message_event
 from src.log_config import set_tick_time
 from src.message_scheduler import MessageScheduler
 from src.raft_node import RaftNode, Role
@@ -70,5 +71,6 @@ class Simulation:
             for message in to_deliver:
                 for node in nodes:
                     if node.node_id == message.receiver:
+                        log_message_event("receive", message, node_id=node.node_id)
                         next_tick_messages.extend(node.handle_message(message))
                         break

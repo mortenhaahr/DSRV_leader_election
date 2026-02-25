@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from typing import List
-import logging
-
+from src.log_config import DEBUG, log_message_event
 from src.messages import ElectionMessage
 from src.filters import Filter, ScheduleAction, StatefulFilter, prioritize_actions
 from src.simulation_state import SimulationState
@@ -36,7 +35,6 @@ class MessageScheduler:
 
     def deliver_messages(self, current_tick: int) -> List[ElectionMessage]:
         """Return all messages scheduled where no filter delays or drops them."""
-        logger = logging.getLogger()
         to_deliver = []
         remaining = deque()
         while self._scheduled:
@@ -46,8 +44,9 @@ class MessageScheduler:
             ]
             action = prioritize_actions(actions)
             if action == ScheduleAction.DROP:
-                logger.debug(f"Dropping message {message}")
+                log_message_event("drop", message, level=DEBUG)
             elif action == ScheduleAction.DELIVER:
+                log_message_event("deliver", message)
                 to_deliver.append(message)
             elif action == ScheduleAction.DELAY:
                 remaining.append(message)
