@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 import random
 
 from src.messages import ElectionMessage
@@ -25,43 +25,38 @@ def prioritize_actions(actions: list[ScheduleAction]) -> ScheduleAction:
 class Filter(Protocol):
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction: ...
 
-
-@runtime_checkable
-class StatefulFilter(Filter, Protocol):
     def set_sim_state(self, sim_state: SimulationState) -> None: ...
 
 
-class LeaderSenderFilter(StatefulFilter):
+class LeaderSenderFilter(Filter):
     def __init__(self, inner: Filter):
         self.leader_id: int | None = None
         self.inner = inner
 
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
         if self.leader_id is not None and message.sender == self.leader_id:
-            return ScheduleAction.DROP
-        else:
             return self.inner.filter(message, current_tick)
+        return ScheduleAction.DELIVER
 
     def set_sim_state(self, sim_state: SimulationState) -> None:
         self.leader_id = sim_state.leader_id
 
 
-class LeaderReceiverFilter(StatefulFilter):
+class LeaderReceiverFilter(Filter):
     def __init__(self, inner: Filter):
         self.leader_id: int | None = None
         self.inner = inner
 
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
         if self.leader_id is not None and message.receiver == self.leader_id:
-            return ScheduleAction.DROP
-        else:
             return self.inner.filter(message, current_tick)
+        return ScheduleAction.DELIVER
 
     def set_sim_state(self, sim_state: SimulationState) -> None:
         self.leader_id = sim_state.leader_id
 
 
-class LeaderSenderReceiverFilter(StatefulFilter):
+class LeaderSenderReceiverFilter(Filter):
     def __init__(self, inner: Filter):
         self.leader_id: int | None = None
         self.sender_filter = LeaderSenderFilter(inner)
@@ -98,6 +93,9 @@ class TimedFilter:
         else:
             return ScheduleAction.DELIVER
 
+    def set_sim_state(self, sim_state: SimulationState) -> None:
+        self.inner.set_sim_state(sim_state)
+
 
 class SenderFilter:
     """
@@ -117,6 +115,9 @@ class SenderFilter:
             return self.inner.filter(message, current_tick)
         else:
             return ScheduleAction.DELIVER
+
+    def set_sim_state(self, sim_state: SimulationState) -> None:
+        self.inner.set_sim_state(sim_state)
 
 
 class ReceiverFilter:
@@ -138,6 +139,9 @@ class ReceiverFilter:
         else:
             return ScheduleAction.DELIVER
 
+    def set_sim_state(self, sim_state: SimulationState) -> None:
+        self.inner.set_sim_state(sim_state)
+
 
 class SenderReceiverFilter:
     """
@@ -157,6 +161,10 @@ class SenderReceiverFilter:
         sender_action = self.sender_filter.filter(message, current_tick)
         receiver_action = self.receiver_filter.filter(message, current_tick)
         return prioritize_actions([sender_action, receiver_action])
+
+    def set_sim_state(self, sim_state: SimulationState) -> None:
+        self.sender_filter.set_sim_state(sim_state)
+        self.receiver_filter.set_sim_state(sim_state)
 
 
 class LatencyFilter:
@@ -182,6 +190,9 @@ class LatencyFilter:
             self.delay_schedule[msg_id] = current_tick + delay
             return ScheduleAction.DELAY
 
+    def set_sim_state(self, sim_state: SimulationState) -> None:
+        return None
+
 
 class CrashFilter:
     """
@@ -190,3 +201,6 @@ class CrashFilter:
 
     def filter(self, message: ElectionMessage, current_tick: int) -> ScheduleAction:
         return ScheduleAction.DROP
+
+    def set_sim_state(self, sim_state: SimulationState) -> None:
+        return None

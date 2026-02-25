@@ -4,7 +4,7 @@ from collections import deque
 from typing import List
 from src.log_config import DEBUG, log_message_event
 from src.messages import ElectionMessage
-from src.filters import Filter, ScheduleAction, StatefulFilter, prioritize_actions
+from src.filters import Filter, ScheduleAction, prioritize_actions
 from src.simulation_state import SimulationState
 
 
@@ -30,8 +30,7 @@ class MessageScheduler:
     def update_state(self, sim_state: SimulationState) -> None:
         """Update stateful filters with the latest simulation state."""
         for filter_obj in self._filters:
-            if isinstance(filter_obj, StatefulFilter):
-                filter_obj.set_sim_state(sim_state)
+            filter_obj.set_sim_state(sim_state)
 
     def deliver_messages(self, current_tick: int) -> List[ElectionMessage]:
         """Return all messages scheduled where no filter delays or drops them."""
