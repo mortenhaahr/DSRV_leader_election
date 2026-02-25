@@ -123,21 +123,3 @@ def json_parse_config_str(json_str: str, seed: int = 0) -> dict[str, Any]:
     """
     sim_config = json.loads(json_str)
     return json_parse_config_dict(sim_config, seed=seed)
-
-
-if __name__ == "__main__":
-    example = {
-        "duration_s": 1.0,
-        "num_nodes": 7,
-        "tick_ms": 1,
-        "heartbeat_interval_ms": 10.0,
-        "seed": 42,
-        "log_level": "WARNING",
-        "node_timeout_range_ms": [10, 20],
-        "filters": [
-            {"type": "crash"},
-            {"type": "latency", "delay_ms": [5, 15]},
-        ],
-    }
-
-    print(json_parse_config_str(json.dumps(example)))
