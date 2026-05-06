@@ -1,6 +1,6 @@
 {
   "duration_s": 0.7,
-  "num_nodes": 5,
+  "num_nodes": 3,
   "tick_ms": 1,
   "heartbeat_interval_ms": 15.0,
   "seed": 7,
@@ -15,6 +15,13 @@
           "type": "crash"
         }
       }
+    },
+    {
+      "type": "latency",
+      "delay_ms": [
+        10,
+        30
+      ]
     }
   ]
 }

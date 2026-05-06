@@ -63,7 +63,7 @@ class Simulation:
                 if node.state == Role.LEADER:
                     leader_id = node.node_id
                     break
-            sim_state = SimulationState(leader_id=leader_id)
+            sim_state = SimulationState(leader_id=leader_id, current_tick=tick)
             scheduler.update_state(sim_state)
 
             # Deliver all messages scheduled for this tick

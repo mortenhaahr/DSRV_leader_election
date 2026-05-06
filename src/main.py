@@ -55,6 +55,7 @@ def print_config_summary(config: dict) -> None:
 
 
 if __name__ == "__main__":
+    # TODO: Bug that we are logging the sending time as the time of receiving the message. (Not sure if bug still is prevalent)
     args = cli_parse_args()
     config = vars(args).copy()
     if args.json:

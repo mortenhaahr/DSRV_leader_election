@@ -18,6 +18,7 @@ class MessageScheduler:
         # delivery_tick -> deque of (message, receiver_id)
         self._scheduled = deque()
         self._filters: List[Filter] = []
+        self._sim_state: SimulationState | None = None
 
     def add_filter(self, filter_obj: Filter):
         """Add a Filter object implementing filter()."""
@@ -25,10 +26,13 @@ class MessageScheduler:
 
     def schedule_messages(self, messages: List[ElectionMessage]):
         """Schedule multiple messages for delivery."""
+        for message in messages:
+            log_message_event("schedule", message)
         self._scheduled.extend(messages)
 
     def update_state(self, sim_state: SimulationState) -> None:
         """Update stateful filters with the latest simulation state."""
+        self._sim_state = sim_state
         for filter_obj in self._filters:
             filter_obj.set_sim_state(sim_state)
 
@@ -45,9 +49,9 @@ class MessageScheduler:
             if action == ScheduleAction.DROP:
                 log_message_event("drop", message, level=DEBUG)
             elif action == ScheduleAction.DELIVER:
-                log_message_event("deliver", message)
                 to_deliver.append(message)
             elif action == ScheduleAction.DELAY:
+                log_message_event("delay", message, level=DEBUG)
                 remaining.append(message)
         self._scheduled = remaining
         return to_deliver
