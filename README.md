@@ -66,7 +66,7 @@ You can emit RAFT simulation events to MQTT by enabling the MQTT event logger ba
 
 ### Example run
 
-```DSRV_leader_election/README.md#L13-16
+```bash
 uv run python -m dsrv_leader_election.main \
   --event-logger mqtt \
   --mqtt-broker localhost \
