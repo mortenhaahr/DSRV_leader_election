@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from ..messages import (
@@ -20,7 +21,26 @@ class RaftEventEmitter:
     def is_enabled(self) -> bool:
         return self.event_logger is not None
 
-    def emit_map(self, event_name: str, payload: dict[str, TCData]) -> None:
+    def _log_console(
+        self,
+        event_name: str,
+        payload: dict[str, TCData],
+        *,
+        level: int,
+    ) -> None:
+        logger = logging.getLogger()
+        kv = " ".join(f"{k}={v}" for k, v in payload.items() if k != "event")
+
+        logger.log(level, "event=%s %s", event_name, kv)
+
+    def emit_map(
+        self,
+        event_name: str,
+        payload: dict[str, TCData],
+        *,
+        level: int = logging.INFO,
+    ) -> None:
+        self._log_console(event_name, payload, level=level)
         if self.event_logger is None:
             return
         self.event_logger.emit(event_name, TypedTCData("Map", payload))
@@ -33,7 +53,9 @@ class RaftEventEmitter:
         tick: int,
         node_id: int | None = None,
         extra: dict[str, TCData] | None = None,
+        level: int = logging.INFO,
     ) -> None:
+
         payload: dict[str, TCData] = {
             "event": event_name,
             "tick": tick,
@@ -64,4 +86,4 @@ class RaftEventEmitter:
         if extra is not None:
             payload.update(extra)
 
-        self.emit_map(event_name, payload)
+        self.emit_map(event_name, payload, level=level)

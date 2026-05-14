@@ -4,7 +4,7 @@ from collections import deque
 
 from .event_logger.raft_event_emitter import RaftEventEmitter
 from .filters import Filter, ScheduleAction, prioritize_actions
-from .log_config import DEBUG, log_message_event
+from .log_config import DEBUG
 from .messages import ElectionMessage
 from .simulation_state import SimulationState
 
@@ -33,7 +33,6 @@ class MessageScheduler:
     def schedule_messages(self, messages: list[ElectionMessage]) -> None:
         """Schedule multiple messages for delivery."""
         for message in messages:
-            log_message_event("schedule", message)
             tick = (
                 0
                 if self._sim_state is None or self._sim_state.current_tick is None
@@ -64,21 +63,23 @@ class MessageScheduler:
             ]
             action = prioritize_actions(actions)
             if action == ScheduleAction.DROP:
-                log_message_event("drop", message, level=DEBUG)
                 self._event_emitter.emit_message_event(
                     "message_dropped",
                     message,
                     tick=current_tick,
+                    level=DEBUG,
                 )
+
             elif action == ScheduleAction.DELIVER:
                 to_deliver.append(message)
             elif action == ScheduleAction.DELAY:
-                log_message_event("delay", message, level=DEBUG)
                 self._event_emitter.emit_message_event(
                     "message_delayed",
                     message,
                     tick=current_tick,
+                    level=DEBUG,
                 )
+
                 remaining.append(message)
 
         self._scheduled = remaining

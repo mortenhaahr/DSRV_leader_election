@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from .event_logger.raft_event_emitter import RaftEventEmitter
 from .filters import Filter
-from .log_config import log_message_event, set_tick_time
+from .log_config import set_tick_time
 from .message_scheduler import MessageScheduler
 from .messages import ElectionMessage
 from .raft_node import RaftNode, Role
@@ -112,7 +112,6 @@ class Simulation:
                 )
                 for node in nodes:
                     if node.node_id == message.receiver:
-                        log_message_event("receive", message, node_id=node.node_id)
                         next_tick_messages.extend(node.handle_message(message))
                         break
 

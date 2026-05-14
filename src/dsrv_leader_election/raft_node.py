@@ -7,7 +7,7 @@ from enum import Enum
 from typing import override
 
 from .event_logger.raft_event_emitter import RaftEventEmitter
-from .log_config import DEBUG, INFO, log_message_event
+from .log_config import DEBUG, INFO
 from .messages import (
     AppendEntries,
     AppendEntriesResponse,
@@ -402,17 +402,12 @@ class RaftNode:
         if not messages:
             return
         for msg in messages:
-            log_message_event(
-                "generate",
-                msg,
-                node_id=self.node_id,
-                level=DEBUG,
-            )
             self.event_emitter.emit_message_event(
                 "message_generated",
                 msg,
                 tick=self.current_time_ms,
                 node_id=self.node_id,
+                level=DEBUG,
             )
 
     def handle_tick(self, tick_time_ms: int) -> list[ElectionMessage]:
