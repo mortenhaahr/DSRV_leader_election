@@ -19,8 +19,9 @@ If `uv` is not installed yet:
 From the repository root:
 
 ```bash
-uv sync
+uv sync --frozen
 ```
+
 
 ### Run the simulation
 
