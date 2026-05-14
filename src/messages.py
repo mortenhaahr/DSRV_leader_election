@@ -8,12 +8,15 @@ from dataclasses import dataclass
 
 
 class ElectionMessage:
+    _id_counter: int = 0
+    sender: int
+    receiver: int
+    msg_id: int | None
+
     """
     Base class for all election-related messages in the Raft protocol.
     Adds a unique msg_id to each message.
     """
-
-    _id_counter = 0
 
     @classmethod
     def next_id(cls) -> int:

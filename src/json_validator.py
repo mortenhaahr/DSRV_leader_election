@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import cast
 
 from src.log_config import LOG_LEVELS
 
 
 class ValidationError(ValueError):
     pass
+
 
 _FILTER_TYPES = {
     "timed",
@@ -21,11 +22,11 @@ _FILTER_TYPES = {
 }
 
 
-def _is_int(value: Any) -> bool:
+def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def _is_number(value: Any) -> bool:
+def _is_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
@@ -43,42 +44,46 @@ def _error(path: str, message: str) -> None:
     raise ValidationError(message)
 
 
-def _expect_dict(value: Any, path: str) -> dict[str, Any]:
+def _expect_dict(value: object, path: str) -> dict[str, object]:
     if not isinstance(value, dict):
         _error(path, f"expected object, got {type(value).__name__}")
-    return value
+    return cast(dict[str, object], value)
 
 
-def _expect_list(value: Any, path: str) -> list[Any]:
+def _expect_list(value: object, path: str) -> list[object]:
     if not isinstance(value, list):
         _error(path, f"expected array, got {type(value).__name__}")
-    return value
+    return cast(list[object], value)
 
 
-def _expect_string(value: Any, path: str) -> str:
+def _expect_string(value: object, path: str) -> str:
     if not isinstance(value, str):
         _error(path, f"expected string, got {type(value).__name__}")
-    return value
+    return cast(str, value)
 
 
-def _expect_int(value: Any, path: str, *, min_value: int | None = None) -> int:
+def _expect_int(value: object, path: str, *, min_value: int | None = None) -> int:
     if not _is_int(value):
         _error(path, f"expected integer, got {type(value).__name__}")
-    if min_value is not None and value < min_value:
-        _error(path, f"expected integer >= {min_value}, got {value}")
-    return value
+    int_value = cast(int, value)
+    if min_value is not None and int_value < min_value:
+        _error(path, f"expected integer >= {min_value}, got {int_value}")
+    return int_value
 
 
-def _expect_number(value: Any, path: str, *, min_exclusive: float | None = None) -> float:
+def _expect_number(
+    value: object, path: str, *, min_exclusive: float | None = None
+) -> float:
     if not _is_number(value):
         _error(path, f"expected number, got {type(value).__name__}")
-    if min_exclusive is not None and value <= min_exclusive:
-        _error(path, f"expected number > {min_exclusive}, got {value}")
-    return float(value)
+    number_value = float(cast(int | float, value))
+    if min_exclusive is not None and number_value <= min_exclusive:
+        _error(path, f"expected number > {min_exclusive}, got {number_value}")
+    return number_value
 
 
 def _check_keys(
-    obj: dict[str, Any],
+    obj: dict[str, object],
     path: str,
     *,
     required: set[str],
@@ -96,37 +101,47 @@ def _check_keys(
         _error(path, f"unexpected key(s): {extra_list}")
 
 
-def _validate_filter(obj: Any, path: str) -> None:
+def _validate_filter(obj: object, path: str) -> None:
     filter_obj = _expect_dict(obj, path)
     if "type" not in filter_obj:
         _error(path, "missing required key(s): type")
+
     filter_type = _expect_string(filter_obj.get("type"), _path(path, "type"))
     if filter_type not in _FILTER_TYPES:
         allowed = ", ".join(sorted(_FILTER_TYPES))
-        _error(_path(path, "type"), f"unknown filter type '{filter_type}', allowed: {allowed}")
+        _error(
+            _path(path, "type"),
+            f"unknown filter type '{filter_type}', allowed: {allowed}",
+        )
 
     if filter_type == "timed":
-        _check_keys(filter_obj, path, required={"type", "start_tick", "duration", "inner"})
-        _expect_int(filter_obj["start_tick"], _path(path, "start_tick"), min_value=0)
-        _expect_int(filter_obj["duration"], _path(path, "duration"), min_value=0)
+        _check_keys(
+            filter_obj, path, required={"type", "start_tick", "duration", "inner"}
+        )
+        _ = _expect_int(
+            filter_obj["start_tick"], _path(path, "start_tick"), min_value=0
+        )
+        _ = _expect_int(filter_obj["duration"], _path(path, "duration"), min_value=0)
         _validate_filter(filter_obj["inner"], _path(path, "inner"))
         return
 
     if filter_type == "sender":
         _check_keys(filter_obj, path, required={"type", "sender_id", "inner"})
-        _expect_int(filter_obj["sender_id"], _path(path, "sender_id"), min_value=0)
+        _ = _expect_int(filter_obj["sender_id"], _path(path, "sender_id"), min_value=0)
         _validate_filter(filter_obj["inner"], _path(path, "inner"))
         return
 
     if filter_type == "receiver":
         _check_keys(filter_obj, path, required={"type", "receiver_id", "inner"})
-        _expect_int(filter_obj["receiver_id"], _path(path, "receiver_id"), min_value=0)
+        _ = _expect_int(
+            filter_obj["receiver_id"], _path(path, "receiver_id"), min_value=0
+        )
         _validate_filter(filter_obj["inner"], _path(path, "inner"))
         return
 
     if filter_type == "sender_receiver":
         _check_keys(filter_obj, path, required={"type", "node_id", "inner"})
-        _expect_int(filter_obj["node_id"], _path(path, "node_id"), min_value=0)
+        _ = _expect_int(filter_obj["node_id"], _path(path, "node_id"), min_value=0)
         _validate_filter(filter_obj["inner"], _path(path, "inner"))
         return
 
@@ -153,7 +168,10 @@ def _validate_filter(obj: Any, path: str) -> None:
         lo = _expect_int(delay_ms[0], _path(path, "delay_ms[0]"), min_value=0)
         hi = _expect_int(delay_ms[1], _path(path, "delay_ms[1]"), min_value=0)
         if lo > hi:
-            _error(_path(path, "delay_ms"), f"expected [min,max] with min<=max, got [{lo}, {hi}]")
+            _error(
+                _path(path, "delay_ms"),
+                f"expected [min,max] with min<=max, got [{lo}, {hi}]",
+            )
         return
 
     if filter_type == "crash":
@@ -161,7 +179,7 @@ def _validate_filter(obj: Any, path: str) -> None:
         return
 
 
-def validate_filter_config(obj: Any) -> None:
+def validate_filter_config(obj: object) -> None:
     """
     Validate the configuration dict and raise ValueError with clear error paths.
     """
@@ -182,23 +200,25 @@ def validate_filter_config(obj: Any) -> None:
     )
 
     if "duration_s" in config:
-        _expect_number(config["duration_s"], _path("", "duration_s"), min_exclusive=0)
+        _ = _expect_number(
+            config["duration_s"], _path("", "duration_s"), min_exclusive=0
+        )
 
     if "num_nodes" in config:
-        _expect_int(config["num_nodes"], _path("", "num_nodes"), min_value=1)
+        _ = _expect_int(config["num_nodes"], _path("", "num_nodes"), min_value=1)
 
     if "tick_ms" in config:
-        _expect_int(config["tick_ms"], _path("", "tick_ms"), min_value=1)
+        _ = _expect_int(config["tick_ms"], _path("", "tick_ms"), min_value=1)
 
     if "heartbeat_interval_ms" in config:
-        _expect_number(
+        _ = _expect_number(
             config["heartbeat_interval_ms"],
             _path("", "heartbeat_interval_ms"),
             min_exclusive=0,
         )
 
     if "seed" in config:
-        _expect_int(config["seed"], _path("", "seed"))
+        _ = _expect_int(config["seed"], _path("", "seed"))
 
     if "log_level" in config:
         log_level = _expect_string(config["log_level"], _path("", "log_level"))
@@ -212,8 +232,12 @@ def validate_filter_config(obj: Any) -> None:
         )
         if len(timeout_range) != 2:
             _error(_path("", "node_timeout_range_ms"), "expected array of 2 integers")
-        _expect_int(timeout_range[0], _path("", "node_timeout_range_ms[0]"), min_value=1)
-        _expect_int(timeout_range[1], _path("", "node_timeout_range_ms[1]"), min_value=1)
+        _ = _expect_int(
+            timeout_range[0], _path("", "node_timeout_range_ms[0]"), min_value=1
+        )
+        _ = _expect_int(
+            timeout_range[1], _path("", "node_timeout_range_ms[1]"), min_value=1
+        )
 
     filters = _expect_list(config.get("filters"), _path("", "filters"))
     for index, item in enumerate(filters):

@@ -1,5 +1,6 @@
 import argparse
 import random
+from typing import cast
 
 from src.log_config import LOG_LEVELS
 
@@ -24,12 +25,14 @@ def cli_parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument("--duration-s", type=_positive_float, default=0.5)
-    parser.add_argument("--num-nodes", type=_positive_int, default=3)
-    parser.add_argument("--tick-ms", type=_positive_int, default=1)
-    parser.add_argument("--heartbeat-interval-ms", type=_positive_float, default=20.0)
-    parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument(
+    _ = parser.add_argument("--duration-s", type=_positive_float, default=0.5)
+    _ = parser.add_argument("--num-nodes", type=_positive_int, default=3)
+    _ = parser.add_argument("--tick-ms", type=_positive_int, default=1)
+    _ = parser.add_argument(
+        "--heartbeat-interval-ms", type=_positive_float, default=20.0
+    )
+    _ = parser.add_argument("--seed", type=int, default=None)
+    _ = parser.add_argument(
         "--log-level",
         default="INFO",
         choices=LOG_LEVELS,
@@ -37,7 +40,7 @@ def cli_parse_args() -> argparse.Namespace:
         help="Log level (debug, info, warning, error, critical)",
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--node-timeout-range-ms",
         metavar=("START", "END"),
         type=_positive_int,
@@ -46,7 +49,7 @@ def cli_parse_args() -> argparse.Namespace:
         help="Range for random election timeout intervals in milliseconds (default: 150 300)",
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--json",
         type=str,
         default=None,
@@ -54,12 +57,28 @@ def cli_parse_args() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
+    raw_args = cast(dict[str, object], vars(args))
 
-    start, end = args.node_timeout_range_ms
-    if start >= end:
+    timeout_range = raw_args.get("node_timeout_range_ms")
+    if isinstance(timeout_range, list):
+        timeout_values = cast(list[object], timeout_range)
+    elif isinstance(timeout_range, tuple):
+        timeout_values = cast(tuple[object, ...], timeout_range)
+    else:
         parser.error("--node-timeout-range-ms START must be < END")
 
-    if args.seed is None:
+    if len(timeout_values) != 2:
+        parser.error("--node-timeout-range-ms START must be < END")
+
+    start_raw, end_raw = timeout_values
+
+    if not isinstance(start_raw, int) or not isinstance(end_raw, int):
+        parser.error("--node-timeout-range-ms START and END must be integers")
+
+    if start_raw >= end_raw:
+        parser.error("--node-timeout-range-ms START must be < END")
+
+    if raw_args.get("seed") is None:
         args.seed = random.randint(0, 100000)
 
     return args

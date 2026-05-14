@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from src.json_parser import json_parse_config_dict
 from src.json_validator import ValidationError
 
-VALID_CONFIGS = [
+VALID_CONFIGS: list[dict[str, object]] = [
     # 1) timed -> sender_receiver -> latency (+ duration_s)
     {
         "duration_s": 2.5,
@@ -179,7 +181,7 @@ VALID_CONFIGS = [
 ]
 
 
-INVALID_CONFIGS = [
+INVALID_CONFIGS: list[dict[str, object]] = [
     # 1) Missing required top-level "filters"
     {},
     # 2) duration_s must be > 0
@@ -212,17 +214,21 @@ INVALID_CONFIGS = [
 
 
 @pytest.mark.parametrize("config", VALID_CONFIGS)
-def test_json_parse_config_dict_valid(config: dict) -> None:
+def test_json_parse_config_dict_valid(config: dict[str, object]) -> None:
     """Ensure valid configs are parsed to filter objects without error."""
     result = json_parse_config_dict(config.copy())
+
     assert "filters" in result
+    filters = result["filters"]
+    assert isinstance(filters, list)
+
     # All filters should be Filter-like objects
-    for filter_obj in result["filters"]:
+    for filter_obj in cast(list[object], filters):
         assert hasattr(filter_obj, "filter")
 
 
 @pytest.mark.parametrize("config", INVALID_CONFIGS)
-def test_json_parse_config_dict_invalid(config: dict) -> None:
+def test_json_parse_config_dict_invalid(config: dict[str, object]) -> None:
     """Ensure invalid configs raise ValidationError."""
     with pytest.raises(ValidationError):
-        json_parse_config_dict(config.copy())
+        _ = json_parse_config_dict(config.copy())

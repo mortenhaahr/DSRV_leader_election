@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import List
+
+from src.filters import Filter, ScheduleAction, prioritize_actions
 from src.log_config import DEBUG, log_message_event
 from src.messages import ElectionMessage
-from src.filters import Filter, ScheduleAction, prioritize_actions
 from src.simulation_state import SimulationState
 
 
@@ -14,17 +14,20 @@ class MessageScheduler:
     Filters determine if a message should be delivered, delayed, or dropped.
     """
 
-    def __init__(self):
-        # delivery_tick -> deque of (message, receiver_id)
-        self._scheduled = deque()
-        self._filters: List[Filter] = []
-        self._sim_state: SimulationState | None = None
+    _scheduled: deque[ElectionMessage]
+    _filters: list[Filter]
+    _sim_state: SimulationState | None
 
-    def add_filter(self, filter_obj: Filter):
+    def __init__(self) -> None:
+        self._scheduled = deque[ElectionMessage]()
+        self._filters = []
+        self._sim_state = None
+
+    def add_filter(self, filter_obj: Filter) -> None:
         """Add a Filter object implementing filter()."""
         self._filters.append(filter_obj)
 
-    def schedule_messages(self, messages: List[ElectionMessage]):
+    def schedule_messages(self, messages: list[ElectionMessage]) -> None:
         """Schedule multiple messages for delivery."""
         for message in messages:
             log_message_event("schedule", message)
@@ -36,10 +39,11 @@ class MessageScheduler:
         for filter_obj in self._filters:
             filter_obj.set_sim_state(sim_state)
 
-    def deliver_messages(self, current_tick: int) -> List[ElectionMessage]:
+    def deliver_messages(self, current_tick: int) -> list[ElectionMessage]:
         """Return all messages scheduled where no filter delays or drops them."""
-        to_deliver = []
-        remaining = deque()
+        to_deliver: list[ElectionMessage] = []
+        remaining: deque[ElectionMessage] = deque()
+
         while self._scheduled:
             message = self._scheduled.popleft()
             actions = [
@@ -53,5 +57,6 @@ class MessageScheduler:
             elif action == ScheduleAction.DELAY:
                 log_message_event("delay", message, level=DEBUG)
                 remaining.append(message)
+
         self._scheduled = remaining
         return to_deliver

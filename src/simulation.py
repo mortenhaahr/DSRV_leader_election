@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 from src.filters import Filter
-from src.log_config import log_message_event
-from src.log_config import set_tick_time
+from src.log_config import log_message_event, set_tick_time
 from src.message_scheduler import MessageScheduler
+from src.messages import ElectionMessage
 from src.raft_node import RaftNode, Role
 from src.simulation_state import SimulationState
 
 
 class Simulation:
+    seed: int
+    num_nodes: int
+    duration_s: float
+    tick_ms: int
+    heartbeat_interval_ms: int
+    node_timeout_range: tuple[int, int]
+    filters: list[Filter]
+
     def __init__(
         self,
         seed: int,
@@ -40,11 +48,10 @@ class Simulation:
         ]
         tick_ms = self.tick_ms
         scheduler = MessageScheduler()
-        filters = self.filters
-        for f in filters:
-            scheduler.add_filter(f)
+        for filter_obj in self.filters:
+            scheduler.add_filter(filter_obj)
 
-        next_tick_messages = []
+        next_tick_messages: list[ElectionMessage] = []
         for tick in range(0, int(self.duration_s * 1000), tick_ms):
             set_tick_time(tick)
 

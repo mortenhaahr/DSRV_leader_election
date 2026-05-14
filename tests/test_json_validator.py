@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from src.json_parser import validate_filter_config
-from src.json_validator import ValidationError
+from src.json_validator import ValidationError, validate_filter_config
 
-VALID_CONFIGS = [
+VALID_CONFIGS: list[dict[str, object]] = [
     # 1) timed -> sender_receiver -> latency (+ duration_s)
     {
         "duration_s": 2.5,
@@ -179,7 +178,7 @@ VALID_CONFIGS = [
 ]
 
 
-INVALID_CONFIGS = [
+INVALID_CONFIGS: list[dict[str, object]] = [
     # 1) Missing required top-level "filters"
     {},
     # 2) duration_s must be > 0
@@ -212,13 +211,13 @@ INVALID_CONFIGS = [
 
 
 @pytest.mark.parametrize("config", VALID_CONFIGS)
-def test_validate_filter_config_valid(config: dict) -> None:
+def test_validate_filter_config_valid(config: dict[str, object]) -> None:
     """Ensure filter configs are validated correctly."""
     validate_filter_config(config)
 
 
 @pytest.mark.parametrize("config", INVALID_CONFIGS)
-def test_validate_filter_config_invalid(config: dict) -> None:
+def test_validate_filter_config_invalid(config: dict[str, object]) -> None:
     """Ensure invalid filter configs are rejected by validation."""
     with pytest.raises(ValidationError):
         validate_filter_config(config)

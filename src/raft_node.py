@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from enum import Enum
-
 import logging
 import random
-from typing import List
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import override
 
+from src.log_config import DEBUG, INFO, log_message_event
 from src.messages import (
     AppendEntries,
     AppendEntriesResponse,
@@ -14,7 +14,6 @@ from src.messages import (
     RequestVote,
     RequestVoteResponse,
 )
-from src.log_config import DEBUG, INFO, log_message_event
 
 
 class Role(Enum):
@@ -30,17 +29,21 @@ class _RoleBehavior(ABC):
         pass
 
     @abstractmethod
-    def handle_tick(self, node: RaftNode) -> List[ElectionMessage]:
+    def handle_tick(self, node: RaftNode) -> list[ElectionMessage]:
         pass
 
     @abstractmethod
     def handle_message(
         self, node: RaftNode, message: ElectionMessage
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         pass
 
 
 class _FollowerBehavior(_RoleBehavior):
+    last_heartbeat_ms: int
+    next_deadline: int
+    voted_for: int | None
+
     def __init__(
         self,
         last_heartbeat_ms: int,
@@ -52,17 +55,19 @@ class _FollowerBehavior(_RoleBehavior):
         self.voted_for = voted_for
 
     @property
+    @override
     def role(self) -> Role:
         return Role.FOLLOWER
 
-    def handle_tick(self, node: RaftNode) -> List[ElectionMessage]:
+    @override
+    def handle_tick(self, node: RaftNode) -> list[ElectionMessage]:
         if node.current_time_ms - self.last_heartbeat_ms >= self.next_deadline:
-            return node._become_candidate()
+            return node.become_candidate()
         return []
 
     def _handle_message_request_vote(
         self, node: RaftNode, message: RequestVote
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if message.term < node.current_term:
             return [
                 RequestVoteResponse(
@@ -82,7 +87,7 @@ class _FollowerBehavior(_RoleBehavior):
         if grant_vote:
             self.voted_for = message.candidate_id
             self.last_heartbeat_ms = node.current_time_ms
-            self.next_deadline = node._draw_election_deadline()
+            self.next_deadline = node.draw_election_deadline()
 
         return [
             RequestVoteResponse(
@@ -96,7 +101,7 @@ class _FollowerBehavior(_RoleBehavior):
 
     def _handle_message_append_entries(
         self, node: RaftNode, message: AppendEntries
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if message.term < node.current_term:
             return [
                 AppendEntriesResponse(
@@ -113,7 +118,7 @@ class _FollowerBehavior(_RoleBehavior):
             self.voted_for = None
 
         self.last_heartbeat_ms = node.current_time_ms
-        self.next_deadline = node._draw_election_deadline()
+        self.next_deadline = node.draw_election_deadline()
         return [
             AppendEntriesResponse(
                 term=node.current_term,
@@ -124,9 +129,10 @@ class _FollowerBehavior(_RoleBehavior):
             )
         ]
 
+    @override
     def handle_message(
         self, node: RaftNode, message: ElectionMessage
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if isinstance(message, RequestVote):
             return self._handle_message_request_vote(node, message)
 
@@ -138,6 +144,11 @@ class _FollowerBehavior(_RoleBehavior):
 
 
 class _CandidateBehavior(_RoleBehavior):
+    last_heartbeat_ms: int
+    next_deadline: int
+    votes_received: int
+    votes_from: set[int]
+
     def __init__(
         self,
         last_heartbeat_ms: int,
@@ -151,23 +162,25 @@ class _CandidateBehavior(_RoleBehavior):
         self.votes_from = votes_from
 
     @property
+    @override
     def role(self) -> Role:
         return Role.CANDIDATE
 
-    def handle_tick(self, node: RaftNode) -> List[ElectionMessage]:
-        if self.votes_received >= node._quorum_size():
-            return node._become_leader()
+    @override
+    def handle_tick(self, node: RaftNode) -> list[ElectionMessage]:
+        if self.votes_received >= node.quorum_size():
+            return node.become_leader()
 
         if node.current_time_ms - self.last_heartbeat_ms >= self.next_deadline:
-            return node._become_candidate()
+            return node.become_candidate()
 
         return []
 
     def _handle_message_request_vote_response(
         self, node: RaftNode, message: RequestVoteResponse
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if message.term > node.current_term:
-            node._become_follower(term=message.term)
+            node.become_follower(term=message.term)
             return []
 
         if message.term < node.current_term:
@@ -183,18 +196,18 @@ class _CandidateBehavior(_RoleBehavior):
                 node.node_id,
                 message.voter_id,
                 self.votes_received,
-                node._quorum_size(),
+                node.quorum_size(),
             )
-            if self.votes_received >= node._quorum_size():
-                return node._become_leader()
+            if self.votes_received >= node.quorum_size():
+                return node.become_leader()
 
         return []
 
     def _handle_message_request_vote(
         self, node: RaftNode, message: RequestVote
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if message.term > node.current_term:
-            node._become_follower(term=message.term)
+            node.become_follower(term=message.term)
             return node.handle_message(message)
 
         return [
@@ -209,9 +222,9 @@ class _CandidateBehavior(_RoleBehavior):
 
     def _handle_message_append_entries(
         self, node: RaftNode, message: AppendEntries
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if message.term >= node.current_term:
-            node._become_follower(term=message.term)
+            node.become_follower(term=message.term)
             return node.handle_message(message)
 
         # Send failure response to lower term AppendEntries
@@ -225,9 +238,10 @@ class _CandidateBehavior(_RoleBehavior):
             )
         ]
 
+    @override
     def handle_message(
         self, node: RaftNode, message: ElectionMessage
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if isinstance(message, RequestVoteResponse):
             return self._handle_message_request_vote_response(node, message)
 
@@ -241,15 +255,20 @@ class _CandidateBehavior(_RoleBehavior):
 
 
 class _LeaderBehavior(_RoleBehavior):
+    heartbeat_interval_ms: int
+    last_heartbeat_sent_ms: int
+
     def __init__(self, heartbeat_interval_ms: int, last_heartbeat_sent_ms: int):
         self.heartbeat_interval_ms = heartbeat_interval_ms
         self.last_heartbeat_sent_ms = last_heartbeat_sent_ms
 
     @property
+    @override
     def role(self) -> Role:
         return Role.LEADER
 
-    def handle_tick(self, node: RaftNode) -> List[ElectionMessage]:
+    @override
+    def handle_tick(self, node: RaftNode) -> list[ElectionMessage]:
         if (
             node.current_time_ms - self.last_heartbeat_sent_ms
             >= self.heartbeat_interval_ms
@@ -271,9 +290,9 @@ class _LeaderBehavior(_RoleBehavior):
 
     def _handle_message_request_vote(
         self, node: RaftNode, message: RequestVote
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if message.term > node.current_term:
-            node._become_follower(term=message.term)
+            node.become_follower(term=message.term)
             return node.handle_message(message)
 
         return [
@@ -288,9 +307,9 @@ class _LeaderBehavior(_RoleBehavior):
 
     def _handle_message_append_entries(
         self, node: RaftNode, message: AppendEntries
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if message.term > node.current_term:
-            node._become_follower(term=message.term)
+            node.become_follower(term=message.term)
             return node.handle_message(message)
 
         # Send failure response to lower term AppendEntries
@@ -306,15 +325,16 @@ class _LeaderBehavior(_RoleBehavior):
 
     def _handle_message_append_entries_response(
         self, node: RaftNode, message: AppendEntriesResponse
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if message.term > node.current_term:
-            node._become_follower(term=message.term)
+            node.become_follower(term=message.term)
             return []
         return []
 
+    @override
     def handle_message(
         self, node: RaftNode, message: ElectionMessage
-    ) -> List[ElectionMessage]:
+    ) -> list[ElectionMessage]:
         if isinstance(message, RequestVote):
             return self._handle_message_request_vote(node, message)
 
@@ -329,6 +349,16 @@ class _LeaderBehavior(_RoleBehavior):
 
 class RaftNode:
     """Raft node that delegates role-specific behavior to a composed state object."""
+
+    node_id: int
+    cluster_size: int
+    current_term: int
+    current_time_ms: int
+    rng: random.Random
+    deadline_range: tuple[int, int]
+    heartbeat_interval_ms: int
+    _behavior: _RoleBehavior
+    state: Role
 
     def __init__(
         self,
@@ -345,13 +375,13 @@ class RaftNode:
         self.rng = random.Random(seed)
         self.deadline_range = deadline_range
         self.heartbeat_interval_ms = heartbeat_interval_ms
-        self._behavior: _RoleBehavior = _FollowerBehavior(
+        self._behavior = _FollowerBehavior(
             last_heartbeat_ms=self.current_time_ms,
-            next_deadline=self._draw_election_deadline(),
+            next_deadline=self.draw_election_deadline(),
         )
         self.state = self._behavior.role
 
-    def handle_tick(self, tick_time_ms: int) -> List[ElectionMessage]:
+    def handle_tick(self, tick_time_ms: int) -> list[ElectionMessage]:
         """Update internal time and execute role-specific tick behavior."""
         self.current_time_ms = tick_time_ms
         messages = self._behavior.handle_tick(self)
@@ -365,7 +395,7 @@ class RaftNode:
                 )
         return messages
 
-    def handle_message(self, message: ElectionMessage) -> List[ElectionMessage]:
+    def handle_message(self, message: ElectionMessage) -> list[ElectionMessage]:
         """Dispatch an incoming election message to the current role behavior."""
         messages = self._behavior.handle_message(self, message)
         if messages:
@@ -391,29 +421,29 @@ class RaftNode:
         self._behavior = behavior
         self.state = behavior.role
 
-    def _draw_election_deadline(self) -> int:
+    def draw_election_deadline(self) -> int:
         return self.rng.randint(*self.deadline_range)
 
-    def _quorum_size(self) -> int:
+    def quorum_size(self) -> int:
         return (self.cluster_size // 2) + 1
 
-    def _become_follower(self, term: int | None = None) -> None:
+    def become_follower(self, term: int | None = None) -> None:
         if term is not None and term > self.current_term:
             self.current_term = term
         self._transition_to(
             _FollowerBehavior(
                 last_heartbeat_ms=self.current_time_ms,
-                next_deadline=self._draw_election_deadline(),
+                next_deadline=self.draw_election_deadline(),
                 voted_for=None,
             )
         )
 
-    def _become_candidate(self) -> List[ElectionMessage]:
+    def become_candidate(self) -> list[ElectionMessage]:
         self.current_term += 1
         self._transition_to(
             _CandidateBehavior(
                 last_heartbeat_ms=self.current_time_ms,
-                next_deadline=self._draw_election_deadline(),
+                next_deadline=self.draw_election_deadline(),
                 votes_received=1,
                 votes_from={self.node_id},
             )
@@ -430,7 +460,7 @@ class RaftNode:
             if other_id != self.node_id
         ]
 
-    def _become_leader(self) -> List[ElectionMessage]:
+    def become_leader(self) -> list[ElectionMessage]:
         leader_behavior = _LeaderBehavior(
             heartbeat_interval_ms=self.heartbeat_interval_ms,
             last_heartbeat_sent_ms=self.current_time_ms,
