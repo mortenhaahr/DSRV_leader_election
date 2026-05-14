@@ -20,4 +20,4 @@ jobs:
         run: uv sync --frozen
 
       - name: Run pyright
-        run: uvx pyright --project pyrightconfig.json
+        run: uv run --with pyright pyright --project pyrightconfig.json
