@@ -8,9 +8,9 @@ type VarName = str
 # types
 #
 # Excludes Deferred and NoVal since these are not explicitly sent
-type TCType = Literal["Int", "Float", "Str", "Bool", "List", "Unit"]
+type TCType = Literal["Int", "Float", "Str", "Bool", "List", "Map", "Unit"]
 
-type TCData = int | float | str | bool | list[TCData]
+type TCData = int | float | str | bool | list[TCData] | dict[str, TCData]
 
 
 @dataclass(frozen=True)
@@ -37,8 +37,11 @@ def validate_tc_data(typ: TCType, data: TCData) -> None:
             assert isinstance(data, bool)
         case "List":
             assert isinstance(data, list)
+        case "Map":
+            assert isinstance(data, dict)
         case "Unit":
             assert data == ()
+
         case _:
             assert_never(typ)
 

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections import deque
 
-from src.filters import Filter, ScheduleAction, prioritize_actions
-from src.log_config import DEBUG, log_message_event
-from src.messages import ElectionMessage
-from src.simulation_state import SimulationState
+from .event_logger.raft_event_emitter import RaftEventEmitter
+from .filters import Filter, ScheduleAction, prioritize_actions
+from .log_config import DEBUG, log_message_event
+from .messages import ElectionMessage
+from .simulation_state import SimulationState
 
 
 class MessageScheduler:
@@ -17,11 +18,13 @@ class MessageScheduler:
     _scheduled: deque[ElectionMessage]
     _filters: list[Filter]
     _sim_state: SimulationState | None
+    _event_emitter: RaftEventEmitter
 
-    def __init__(self) -> None:
+    def __init__(self, event_emitter: RaftEventEmitter | None = None) -> None:
         self._scheduled = deque[ElectionMessage]()
         self._filters = []
         self._sim_state = None
+        self._event_emitter = event_emitter or RaftEventEmitter()
 
     def add_filter(self, filter_obj: Filter) -> None:
         """Add a Filter object implementing filter()."""
@@ -31,6 +34,16 @@ class MessageScheduler:
         """Schedule multiple messages for delivery."""
         for message in messages:
             log_message_event("schedule", message)
+            tick = (
+                0
+                if self._sim_state is None or self._sim_state.current_tick is None
+                else self._sim_state.current_tick
+            )
+            self._event_emitter.emit_message_event(
+                "message_scheduled",
+                message,
+                tick=tick,
+            )
         self._scheduled.extend(messages)
 
     def update_state(self, sim_state: SimulationState) -> None:
@@ -52,10 +65,20 @@ class MessageScheduler:
             action = prioritize_actions(actions)
             if action == ScheduleAction.DROP:
                 log_message_event("drop", message, level=DEBUG)
+                self._event_emitter.emit_message_event(
+                    "message_dropped",
+                    message,
+                    tick=current_tick,
+                )
             elif action == ScheduleAction.DELIVER:
                 to_deliver.append(message)
             elif action == ScheduleAction.DELAY:
                 log_message_event("delay", message, level=DEBUG)
+                self._event_emitter.emit_message_event(
+                    "message_delayed",
+                    message,
+                    tick=current_tick,
+                )
                 remaining.append(message)
 
         self._scheduled = remaining

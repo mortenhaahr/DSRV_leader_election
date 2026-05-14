@@ -2,7 +2,7 @@ import argparse
 import random
 from typing import cast
 
-from src.log_config import LOG_LEVELS
+from .log_config import LOG_LEVELS
 
 
 def _positive_float(x: str) -> float:
@@ -54,6 +54,31 @@ def cli_parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Path to JSON configuration file",
+    )
+
+    _ = parser.add_argument(
+        "--event-logger",
+        choices=("none", "mqtt"),
+        default="none",
+        help="Event logger backend",
+    )
+    _ = parser.add_argument(
+        "--mqtt-broker",
+        type=str,
+        default="localhost",
+        help="MQTT broker hostname or IP",
+    )
+    _ = parser.add_argument(
+        "--mqtt-port",
+        type=_positive_int,
+        default=1883,
+        help="MQTT broker port",
+    )
+    _ = parser.add_argument(
+        "--topic-mapping-json",
+        type=str,
+        default=None,
+        help="Path to event topic mapping JSON file",
     )
 
     args = parser.parse_args()

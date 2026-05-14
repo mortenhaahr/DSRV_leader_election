@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import cast
 
-from event_logger.tc_types import VarName
+from .tc_types import VarName
 
 type TopicName = str
 

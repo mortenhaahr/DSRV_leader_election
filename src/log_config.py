@@ -1,6 +1,13 @@
 import logging
+from typing import override
 
-from src.messages import ElectionMessage
+from .messages import (
+    AppendEntries,
+    AppendEntriesResponse,
+    ElectionMessage,
+    RequestVote,
+    RequestVoteResponse,
+)
 
 LOG_LEVELS = ("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG")
 DEBUG = logging.DEBUG
@@ -9,31 +16,32 @@ WARNING = logging.WARNING
 ERROR = logging.ERROR
 CRITICAL = logging.CRITICAL
 
-_MESSAGE_FIELDS = (
-    "term",
-    "candidate_id",
-    "voter_id",
-    "vote_granted",
-    "leader_id",
-    "follower_id",
-    "success",
-)
+_LEVEL_BY_NAME: dict[str, int] = {
+    "CRITICAL": logging.CRITICAL,
+    "ERROR": logging.ERROR,
+    "WARNING": logging.WARNING,
+    "INFO": logging.INFO,
+    "DEBUG": logging.DEBUG,
+}
 
 
 class TickTimeFilter(logging.Filter):
-    def __init__(self):
+    tick_time: int
+
+    def __init__(self) -> None:
         super().__init__()
         self.tick_time = 0
 
-    def set_tick(self, tick):
+    def set_tick(self, tick: int) -> None:
         self.tick_time = tick
 
-    def filter(self, record):
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
         record.tick_time = self.tick_time
         return True
 
 
-def configure_logging(log_level: str):
+def configure_logging(log_level: str) -> logging.Logger:
     """
     Configure logging to include tick time in the log format.
     """
@@ -46,7 +54,11 @@ def configure_logging(log_level: str):
     logger = logging.getLogger()
     logger.handlers.clear()
     logger.addHandler(handler)
-    logger.setLevel(getattr(logging, log_level.upper()))
+    level_name = log_level.upper()
+    if level_name not in _LEVEL_BY_NAME:
+        raise ValueError(f"Invalid log level: {log_level}")
+    logger.setLevel(_LEVEL_BY_NAME[level_name])
+
     return logger
 
 
@@ -54,7 +66,7 @@ def configure_logging(log_level: str):
 _tick_time_filter: TickTimeFilter | None = None
 
 
-def set_tick_time(tick: int):
+def set_tick_time(tick: int) -> None:
     """
     Set the current tick time for logging.
     """
@@ -69,10 +81,22 @@ def _message_kv(message: ElectionMessage) -> str:
         f"sender={message.sender}",
         f"receiver={message.receiver}",
     ]
-    for field in _MESSAGE_FIELDS:
-        if hasattr(message, field):
-            value = getattr(message, field)
-            parts.append(f"{field}={value}")
+
+    if isinstance(message, RequestVote):
+        parts.append(f"term={message.term}")
+        parts.append(f"candidate_id={message.candidate_id}")
+    elif isinstance(message, RequestVoteResponse):
+        parts.append(f"term={message.term}")
+        parts.append(f"voter_id={message.voter_id}")
+        parts.append(f"vote_granted={message.vote_granted}")
+    elif isinstance(message, AppendEntries):
+        parts.append(f"term={message.term}")
+        parts.append(f"leader_id={message.leader_id}")
+    elif isinstance(message, AppendEntriesResponse):
+        parts.append(f"term={message.term}")
+        parts.append(f"follower_id={message.follower_id}")
+        parts.append(f"success={message.success}")
+
     return " ".join(parts)
 
 

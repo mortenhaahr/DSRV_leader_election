@@ -1,7 +1,11 @@
 from typing import cast
 
-from src.cli_parser import cli_parse_args
-from src.filters import (
+from .cli_parser import cli_parse_args
+from .event_logger.mqtt_logger import MqttLogger
+from .event_logger.raft_event_emitter import RaftEventEmitter
+from .event_logger.rv_logger import EventLogger
+from .event_logger.topic_mapping import TopicMapping
+from .filters import (
     CrashFilter,
     Filter,
     LatencyFilter,
@@ -10,9 +14,9 @@ from src.filters import (
     SenderReceiverFilter,
     TimedFilter,
 )
-from src.json_parser import json_parse_config_file
-from src.log_config import configure_logging
-from src.simulation import Simulation
+from .json_parser import json_parse_config_file
+from .log_config import configure_logging
+from .simulation import Simulation
 
 
 def _to_int(value: object, field: str) -> int:
@@ -57,7 +61,34 @@ def _format_filter_details(filter_obj: object) -> str:
     return type(filter_obj).__name__
 
 
+def _load_topic_mapping(path: str) -> TopicMapping:
+    with open(path, "r", encoding="utf-8") as file_obj:
+        return TopicMapping.from_json(file_obj.read())
+
+
+def _build_event_logger(raw_args: dict[str, object]) -> EventLogger | None:
+    event_logger_backend = str(raw_args.get("event_logger", "none"))
+    if event_logger_backend != "mqtt":
+        return None
+
+    mapping_path = raw_args.get("topic_mapping_json")
+    if not isinstance(mapping_path, str) or not mapping_path:
+        raise ValueError("--topic-mapping-json is required when --event-logger mqtt")
+
+    topic_mapping = _load_topic_mapping(mapping_path)
+
+    broker_raw = raw_args.get("mqtt_broker", "localhost")
+    if not isinstance(broker_raw, str) or not broker_raw:
+        raise ValueError("--mqtt-broker must be a non-empty string")
+
+    port_raw = raw_args.get("mqtt_port", 1883)
+    mqtt_port = _to_int(port_raw, "mqtt_port")
+
+    return MqttLogger(broker=broker_raw, port=mqtt_port, topic_mapping=topic_mapping)
+
+
 def print_config_summary(config: dict[str, object]) -> None:
+
     raw_filters = config.get("filters")
     if isinstance(raw_filters, list):
         typed_filters = cast(list[object], raw_filters)
@@ -134,6 +165,9 @@ if __name__ == "__main__":
     )
 
     print_config_summary(config)
+    event_logger = _build_event_logger(raw_args)
+    event_emitter = RaftEventEmitter(event_logger)
+
     simulation = Simulation(
         seed=_to_int(config["seed"], "seed"),
         num_nodes=_to_int(config["num_nodes"], "num_nodes"),
@@ -144,5 +178,7 @@ if __name__ == "__main__":
         ),
         node_timeout_limits=timeout_range,
         filters=filters,
+        event_emitter=event_emitter,
     )
+
     simulation.run()

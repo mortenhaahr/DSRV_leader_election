@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import cast
 
-from src.filters import (
+from .filters import (
     CrashFilter,
     Filter,
     LatencyFilter,
@@ -15,7 +15,7 @@ from src.filters import (
     SenderReceiverFilter,
     TimedFilter,
 )
-from src.json_validator import validate_filter_config
+from .json_validator import validate_filter_config
 
 
 def _require_int(spec: dict[str, object], key: str) -> int:

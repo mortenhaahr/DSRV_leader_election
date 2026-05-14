@@ -13,9 +13,9 @@ from paho.mqtt.enums import CallbackAPIVersion
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
-from event_logger.mqtt_logger import MqttLogger
-from event_logger.tc_types import TypedTCData
-from event_logger.topic_mapping import TopicMapping
+from src.event_logger.mqtt_logger import MqttLogger
+from src.event_logger.tc_types import TypedTCData
+from src.event_logger.topic_mapping import TopicMapping
 
 
 @runtime_checkable

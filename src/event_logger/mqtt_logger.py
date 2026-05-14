@@ -4,9 +4,9 @@ from typing import override
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion, MQTTErrorCode
 
-from event_logger.rv_logger import EventLogger
-from event_logger.tc_types import TypedTCData, VarName
-from event_logger.topic_mapping import TopicMapping
+from .rv_logger import EventLogger
+from .tc_types import TypedTCData, VarName
+from .topic_mapping import TopicMapping
 
 
 class MqttLoggerException(Exception): ...

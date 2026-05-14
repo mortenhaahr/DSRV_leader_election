@@ -6,8 +6,9 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import override
 
-from src.log_config import DEBUG, INFO, log_message_event
-from src.messages import (
+from .event_logger.raft_event_emitter import RaftEventEmitter
+from .log_config import DEBUG, INFO, log_message_event
+from .messages import (
     AppendEntries,
     AppendEntriesResponse,
     ElectionMessage,
@@ -359,6 +360,7 @@ class RaftNode:
     heartbeat_interval_ms: int
     _behavior: _RoleBehavior
     state: Role
+    event_emitter: RaftEventEmitter
 
     def __init__(
         self,
@@ -367,10 +369,14 @@ class RaftNode:
         deadline_range: tuple[int, int],
         heartbeat_interval_ms: int,
         cluster_size: int,
+        event_emitter: RaftEventEmitter | None = None,
     ):
+
         self.node_id = node_id
         self.cluster_size = cluster_size
         self.current_term = 0
+        self.event_emitter = event_emitter or RaftEventEmitter()
+
         self.current_time_ms = 0
         self.rng = random.Random(seed)
         self.deadline_range = deadline_range
@@ -380,43 +386,76 @@ class RaftNode:
             next_deadline=self.draw_election_deadline(),
         )
         self.state = self._behavior.role
+        self.event_emitter.emit_map(
+            "node_initialized",
+            {
+                "event": "node_initialized",
+                "tick": self.current_time_ms,
+                "node_id": self.node_id,
+                "term": self.current_term,
+                "role": self.state.value,
+                "cluster_size": self.cluster_size,
+            },
+        )
+
+    def _emit_generated_messages(self, messages: list[ElectionMessage]) -> None:
+        if not messages:
+            return
+        for msg in messages:
+            log_message_event(
+                "generate",
+                msg,
+                node_id=self.node_id,
+                level=DEBUG,
+            )
+            self.event_emitter.emit_message_event(
+                "message_generated",
+                msg,
+                tick=self.current_time_ms,
+                node_id=self.node_id,
+            )
 
     def handle_tick(self, tick_time_ms: int) -> list[ElectionMessage]:
         """Update internal time and execute role-specific tick behavior."""
         self.current_time_ms = tick_time_ms
         messages = self._behavior.handle_tick(self)
-        if messages:
-            for msg in messages:
-                log_message_event(
-                    "generate",
-                    msg,
-                    node_id=self.node_id,
-                    level=DEBUG,
-                )
+        self._emit_generated_messages(messages)
         return messages
 
     def handle_message(self, message: ElectionMessage) -> list[ElectionMessage]:
         """Dispatch an incoming election message to the current role behavior."""
+        self.event_emitter.emit_message_event(
+            "message_received",
+            message,
+            tick=self.current_time_ms,
+            node_id=self.node_id,
+        )
         messages = self._behavior.handle_message(self, message)
-        if messages:
-            for msg in messages:
-                log_message_event(
-                    "generate",
-                    msg,
-                    node_id=self.node_id,
-                    level=DEBUG,
-                )
+        self._emit_generated_messages(messages)
         return messages
 
     def _transition_to(self, behavior: _RoleBehavior) -> None:
         logger = logging.getLogger()
+        from_role = self.state.value
+        to_role = behavior.role.value
         logger.log(
             INFO,
             "node_event=transition node_id=%s from_role=%s to_role=%s term=%s",
             self.node_id,
-            self.state.value,
-            behavior.role.value,
+            from_role,
+            to_role,
             self.current_term,
+        )
+        self.event_emitter.emit_map(
+            "node_role_transition",
+            {
+                "event": "node_role_transition",
+                "tick": self.current_time_ms,
+                "node_id": self.node_id,
+                "from_role": from_role,
+                "to_role": to_role,
+                "term": self.current_term,
+            },
         )
         self._behavior = behavior
         self.state = behavior.role
@@ -428,8 +467,21 @@ class RaftNode:
         return (self.cluster_size // 2) + 1
 
     def become_follower(self, term: int | None = None) -> None:
+        previous_term = self.current_term
         if term is not None and term > self.current_term:
             self.current_term = term
+        if self.current_term != previous_term:
+            self.event_emitter.emit_map(
+                "node_term_changed",
+                {
+                    "event": "node_term_changed",
+                    "tick": self.current_time_ms,
+                    "node_id": self.node_id,
+                    "from_term": previous_term,
+                    "to_term": self.current_term,
+                },
+            )
+
         self._transition_to(
             _FollowerBehavior(
                 last_heartbeat_ms=self.current_time_ms,
@@ -439,7 +491,19 @@ class RaftNode:
         )
 
     def become_candidate(self) -> list[ElectionMessage]:
+        previous_term = self.current_term
         self.current_term += 1
+        self.event_emitter.emit_map(
+            "node_term_changed",
+            {
+                "event": "node_term_changed",
+                "tick": self.current_time_ms,
+                "node_id": self.node_id,
+                "from_term": previous_term,
+                "to_term": self.current_term,
+            },
+        )
+
         self._transition_to(
             _CandidateBehavior(
                 last_heartbeat_ms=self.current_time_ms,
@@ -461,6 +525,7 @@ class RaftNode:
         ]
 
     def become_leader(self) -> list[ElectionMessage]:
+
         leader_behavior = _LeaderBehavior(
             heartbeat_interval_ms=self.heartbeat_interval_ms,
             last_heartbeat_sent_ms=self.current_time_ms,
@@ -470,6 +535,15 @@ class RaftNode:
             self.current_time_ms + self.heartbeat_interval_ms
         )
         self._transition_to(leader_behavior)
+        self.event_emitter.emit_map(
+            "leader_elected",
+            {
+                "event": "leader_elected",
+                "tick": self.current_time_ms,
+                "node_id": self.node_id,
+                "term": self.current_term,
+            },
+        )
         # Send initial AppendEntries to all other nodes as heartbeat
         return [
             AppendEntries(

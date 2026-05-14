@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from src.log_config import LOG_LEVELS
+from .log_config import LOG_LEVELS
 
 
 class ValidationError(ValueError):
