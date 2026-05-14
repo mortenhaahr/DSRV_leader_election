@@ -27,8 +27,9 @@ uv sync
 Use `uv run` so commands run in the managed environment:
 
 ```bash
-uv run python -m src.main
+uv run python -m dsrv_leader_election.main
 ```
+
 
 ### Run tests
 
@@ -44,10 +45,11 @@ MQTT logging is optional. To run the simulation with standard console logging on
 ### Example run (no MQTT)
 
 ```bash
-uv run python -m src.main
+uv run python -m dsrv_leader_election.main
 # or explicitly:
-uv run python -m src.main --event-logger none
+uv run python -m dsrv_leader_election.main --event-logger none
 ```
+
 
 
 ## MQTT event logging
@@ -65,12 +67,13 @@ You can emit RAFT simulation events to MQTT by enabling the MQTT event logger ba
 ### Example run
 
 ```DSRV_leader_election/README.md#L13-16
-uv run python -m src.main \
+uv run python -m dsrv_leader_election.main \
   --event-logger mqtt \
   --mqtt-broker localhost \
   --mqtt-port 1883 \
   --topic-mapping-json example_configs/event_topics/raft_event_topics.json
 ```
+
 
 
 ### Topic mapping JSON format

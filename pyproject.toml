@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
 [project]
 name = "dsrv-leader-election"
 version = "0.1.0"
@@ -9,3 +13,6 @@ dependencies = [
     "pytest>=9.0.3",
     "testcontainers[mqtt,redis]>=4.14.2",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dsrv_leader_election"]

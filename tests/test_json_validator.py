@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.json_validator import ValidationError, validate_filter_config
+from dsrv_leader_election.json_validator import ValidationError, validate_filter_config
 
 VALID_CONFIGS: list[dict[str, object]] = [
     # 1) timed -> sender_receiver -> latency (+ duration_s)

@@ -4,7 +4,8 @@ This repository develops a **simple, academically credible distributed leader-el
 Primary goal: implement and evaluate RAFT leader election behavior (not full log replication) in a way suitable for a conference case study.
 
 ## Change validation
-- The program is executed by running `python -m src.main`.
+- The program is executed by running `python -m dsrv_leader_election.main`.
+
 - There are limited tests so validation is carried out by:
     1. Ensuring no runtime errors.
     2. Validating that the outputs seems sensible.

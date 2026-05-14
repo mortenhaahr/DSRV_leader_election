@@ -4,8 +4,8 @@ from typing import cast
 
 import pytest
 
-from src.json_parser import json_parse_config_dict
-from src.json_validator import ValidationError
+from dsrv_leader_election.json_parser import json_parse_config_dict
+from dsrv_leader_election.json_validator import ValidationError
 
 VALID_CONFIGS: list[dict[str, object]] = [
     # 1) timed -> sender_receiver -> latency (+ duration_s)

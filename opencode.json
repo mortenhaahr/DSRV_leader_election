@@ -4,7 +4,7 @@
     "edit": "allow",
     "read": "allow",
     "bash": {
-      "python -m src.main*": "allow",
+      "python -m dsrv_leader_election.main*": "allow",
       "python -m unittest discover -s tests*": "allow"
     },
     "grep": "allow",
