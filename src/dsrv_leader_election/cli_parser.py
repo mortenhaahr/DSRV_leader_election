@@ -1,5 +1,4 @@
 import argparse
-import random
 from typing import cast
 
 from .config_loader import coerce_timeout_range
@@ -90,8 +89,5 @@ def cli_parse_args() -> argparse.Namespace:
         _ = coerce_timeout_range(timeout_range, "node_timeout_range_ms")
     except ValueError as exc:
         parser.error(str(exc))
-
-    if raw_args.get("seed") is None:
-        args.seed = random.randint(0, 100000)
 
     return args
