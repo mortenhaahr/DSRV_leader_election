@@ -89,6 +89,39 @@ def _transition_sequence(
     return sequence
 
 
+def _message_event_sequence(
+    messages: list[EmittedLogMessage],
+) -> list[tuple[str, str, int, int, int, int]]:
+    sequence: list[tuple[str, str, int, int, int, int]] = []
+    for message in messages:
+        data = message.value.data
+        if not isinstance(data, dict):
+            continue
+
+        event_name = data.get("event")
+        if event_name not in {
+            "message_generated",
+            "message_scheduled",
+            "message_delivered",
+            "message_received",
+            "message_dropped",
+            "message_delayed",
+        }:
+            continue
+
+        sequence.append(
+            (
+                str(event_name),
+                str(data.get("msg_type")),
+                coerce_int(data.get("msg_id"), "msg_id"),
+                coerce_int(data.get("sender"), "sender"),
+                coerce_int(data.get("receiver"), "receiver"),
+                coerce_int(data.get("tick"), "tick"),
+            )
+        )
+    return sequence
+
+
 @pytest.mark.parametrize("seed", RANDOM_SEEDS)
 @pytest.mark.parametrize(
     "config_filename",
@@ -130,6 +163,58 @@ def test_example_config_runs_emit_expected_lifecycle_events(
     assert coerce_int(finished[0]["tick"], "finished.tick") == int(
         coerce_float(simulation.duration_s, "duration_s") * 1000
     ), f"seed={seed} config={config_filename} unexpected simulation_finished tick"
+
+
+def test_message_ids_are_isolated_between_runs() -> None:
+    seed = 42
+    _, messages_a = _run_config("system_crash.json", seed=seed)
+    _, messages_b = _run_config("system_crash.json", seed=seed)
+
+    sequence_a = _message_event_sequence(messages_a)
+    sequence_b = _message_event_sequence(messages_b)
+
+    assert sequence_a, "expected non-empty message sequence for first run"
+    assert sequence_b, "expected non-empty message sequence for second run"
+    assert sequence_a[0][2] == 1, "expected first run to start message ids at 1"
+    assert sequence_b[0][2] == 1, "expected second run to start message ids at 1"
+
+
+def test_running_same_simulation_instance_twice_raises_runtime_error() -> None:
+    simulation, _ = _run_config("system_crash.json", seed=42)
+
+    with pytest.raises(RuntimeError, match="only be run once"):
+        simulation.run()
+
+
+def test_system_crash_exact_message_event_prefix_for_seed_42() -> None:
+    seed = 42
+    _, messages = _run_config("system_crash.json", seed=seed)
+
+    sequence = _message_event_sequence(messages)
+    expected_prefix = [
+        ("message_generated", "RequestVote", 1, 1, 0, 159),
+        ("message_generated", "RequestVote", 2, 1, 2, 159),
+        ("message_scheduled", "RequestVote", 1, 1, 0, 158),
+        ("message_scheduled", "RequestVote", 2, 1, 2, 158),
+        ("message_delivered", "RequestVote", 1, 1, 0, 159),
+        ("message_received", "RequestVote", 1, 1, 0, 159),
+        ("message_generated", "RequestVoteResponse", 3, 0, 1, 159),
+        ("message_delivered", "RequestVote", 2, 1, 2, 159),
+        ("message_received", "RequestVote", 2, 1, 2, 159),
+        ("message_generated", "RequestVoteResponse", 4, 2, 1, 159),
+        ("message_scheduled", "RequestVoteResponse", 3, 0, 1, 159),
+        ("message_scheduled", "RequestVoteResponse", 4, 2, 1, 159),
+        ("message_delivered", "RequestVoteResponse", 3, 0, 1, 160),
+        ("message_received", "RequestVoteResponse", 3, 0, 1, 160),
+        ("message_generated", "AppendEntries", 5, 1, 0, 160),
+        ("message_generated", "AppendEntries", 6, 1, 2, 160),
+        ("message_delivered", "RequestVoteResponse", 4, 2, 1, 160),
+        ("message_received", "RequestVoteResponse", 4, 2, 1, 160),
+    ]
+
+    assert sequence[: len(expected_prefix)] == expected_prefix, (
+        f"seed={seed} expected exact initial message event sequence prefix"
+    )
 
 
 @pytest.mark.parametrize("seed", RANDOM_SEEDS)

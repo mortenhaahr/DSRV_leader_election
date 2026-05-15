@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from .event_logger.raft_event_emitter import RaftEventEmitter
 from .filters import Filter
-from .log_config import set_tick_time
 from .message_scheduler import MessageScheduler
 from .messages import ElectionMessage
 from .raft_node import RaftNode, Role
+from .simulation_context import simulation_run_context
 from .simulation_state import SimulationState
 
 
@@ -19,6 +19,7 @@ class Simulation:
     filters: list[Filter]
     log_level: str
     event_emitter: RaftEventEmitter
+    _has_run: bool
 
     def __init__(
         self,
@@ -42,8 +43,17 @@ class Simulation:
         self.filters = filters or []
         self.log_level = log_level
         self.event_emitter = event_emitter or RaftEventEmitter()
+        self._has_run = False
 
     def run(self) -> None:
+        if self._has_run:
+            raise RuntimeError("Simulation instances can only be run once")
+        self._has_run = True
+        with simulation_run_context:
+            self._run_once()
+
+    def _run_once(self) -> None:
+        simulation_run_context.set_tick_time(0)
         self.event_emitter.emit_map(
             "simulation_started",
             {
@@ -78,7 +88,7 @@ class Simulation:
 
         next_tick_messages: list[ElectionMessage] = []
         for tick in range(0, int(self.duration_s * 1000), tick_ms):
-            set_tick_time(tick)
+            simulation_run_context.set_tick_time(tick)
             self.event_emitter.emit_map(
                 "simulation_tick",
                 {

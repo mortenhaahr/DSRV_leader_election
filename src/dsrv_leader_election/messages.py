@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .simulation_context import simulation_run_context
+
 # -----------------
 # Election messages
 # -----------------
 
 
 class ElectionMessage:
-    _id_counter: int = 0
     sender: int
     receiver: int
     msg_id: int | None
@@ -20,8 +21,8 @@ class ElectionMessage:
 
     @classmethod
     def next_id(cls) -> int:
-        cls._id_counter += 1
-        return cls._id_counter
+        _ = cls
+        return simulation_run_context.next_message_id()
 
     def __init__(self, sender: int, receiver: int, msg_id: int | None = None):
         self.sender = sender
