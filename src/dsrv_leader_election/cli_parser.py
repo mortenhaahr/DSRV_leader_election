@@ -77,7 +77,7 @@ def cli_parse_args() -> argparse.Namespace:
     _ = parser.add_argument(
         "--topic-mapping-json",
         type=str,
-        default=None,
+        default="example_configs/event_topics/raft_event_topics.json",
         help="Path to event topic mapping JSON file",
     )
 
