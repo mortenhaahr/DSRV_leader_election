@@ -34,9 +34,19 @@ uv run python -m dsrv_leader_election.main
 
 ### Run tests
 
+By default, tests that require a live MQTT broker are skipped.
+
 ```bash
 uv run pytest
 ```
+
+To include MQTT integration tests, pass `--test-mqtt`:
+
+```bash
+uv run pytest --test-mqtt
+```
+
+Note that MQTT integration tests use `testcontainers` to launch isolated MQTT brokers and require a working Docker runtime.
 
 ## Running without MQTT logging
 

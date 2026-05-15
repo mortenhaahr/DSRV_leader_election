@@ -1,0 +1,41 @@
+{
+  "simulation_started": {
+    "topic": "raft/simulation/started"
+  },
+  "simulation_tick": {
+    "topic": "raft/simulation/tick"
+  },
+  "simulation_finished": {
+    "topic": "raft/simulation/finished"
+  },
+  "node_initialized": {
+    "topic": "raft/node/initialized"
+  },
+  "node_role_transition": {
+    "topic": "raft/node/role_transition"
+  },
+  "node_term_changed": {
+    "topic": "raft/node/term_changed"
+  },
+  "leader_elected": {
+    "topic": "raft/node/leader_elected"
+  },
+  "message_generated": {
+    "topic": "raft/message/generated"
+  },
+  "message_scheduled": {
+    "topic": "raft/message/scheduled"
+  },
+  "message_delayed": {
+    "topic": "raft/message/delayed"
+  },
+  "message_dropped": {
+    "topic": "raft/message/dropped"
+  },
+  "message_delivered": {
+    "topic": "raft/message/delivered"
+  },
+  "message_received": {
+    "topic": "raft/message/received"
+  }
+}

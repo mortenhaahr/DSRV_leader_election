@@ -1,0 +1,27 @@
+{
+  "duration_s": 0.7,
+  "num_nodes": 3,
+  "tick_ms": 1,
+  "heartbeat_interval_ms": 15.0,
+  "seed": 7,
+  "filters": [
+    {
+      "type": "timed",
+      "start_tick": 250,
+      "duration": 300,
+      "inner": {
+        "type": "leader_msg",
+        "inner": {
+          "type": "crash"
+        }
+      }
+    },
+    {
+      "type": "latency",
+      "delay_ms": [
+        10,
+        30
+      ]
+    }
+  ]
+}

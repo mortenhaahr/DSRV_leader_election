@@ -2,6 +2,7 @@ import argparse
 import random
 from typing import cast
 
+from .config_loader import coerce_timeout_range
 from .log_config import LOG_LEVELS
 
 
@@ -85,23 +86,10 @@ def cli_parse_args() -> argparse.Namespace:
     raw_args = cast(dict[str, object], vars(args))
 
     timeout_range = raw_args.get("node_timeout_range_ms")
-    if isinstance(timeout_range, list):
-        timeout_values = cast(list[object], timeout_range)
-    elif isinstance(timeout_range, tuple):
-        timeout_values = cast(tuple[object, ...], timeout_range)
-    else:
-        parser.error("--node-timeout-range-ms START must be < END")
-
-    if len(timeout_values) != 2:
-        parser.error("--node-timeout-range-ms START must be < END")
-
-    start_raw, end_raw = timeout_values
-
-    if not isinstance(start_raw, int) or not isinstance(end_raw, int):
-        parser.error("--node-timeout-range-ms START and END must be integers")
-
-    if start_raw >= end_raw:
-        parser.error("--node-timeout-range-ms START must be < END")
+    try:
+        _ = coerce_timeout_range(timeout_range, "node_timeout_range_ms")
+    except ValueError as exc:
+        parser.error(str(exc))
 
     if raw_args.get("seed") is None:
         args.seed = random.randint(0, 100000)

@@ -1,0 +1,53 @@
+{
+  "duration_s": 0.5,
+  "num_nodes": 5,
+  "tick_ms": 1,
+  "heartbeat_interval_ms": 15.0,
+  "seed": 7,
+  "log_level": "INFO",
+  "node_timeout_range_ms": [
+    120,
+    240
+  ],
+  "filters": [
+    {
+      "type": "timed",
+      "start_tick": 50,
+      "duration": 100,
+      "inner": {
+        "type": "sender",
+        "sender_id": 1,
+        "inner": {
+          "type": "latency",
+          "delay_ms": [
+            10,
+            30
+          ]
+        }
+      }
+    },
+    {
+      "type": "receiver",
+      "receiver_id": 2,
+      "inner": {
+        "type": "crash"
+      }
+    },
+    {
+      "type": "sender_receiver",
+      "node_id": 3,
+      "inner": {
+        "type": "timed",
+        "start_tick": 200,
+        "duration": 50,
+        "inner": {
+          "type": "latency",
+          "delay_ms": [
+            5,
+            20
+          ]
+        }
+      }
+    }
+  ]
+}

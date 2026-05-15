@@ -17,6 +17,7 @@ class Simulation:
     heartbeat_interval_ms: int
     node_timeout_range: tuple[int, int]
     filters: list[Filter]
+    log_level: str
     event_emitter: RaftEventEmitter
 
     def __init__(
@@ -29,6 +30,7 @@ class Simulation:
         node_timeout_limits: tuple[int, int],
         filters: list[Filter] | None = None,
         event_emitter: RaftEventEmitter | None = None,
+        log_level: str = "INFO",
     ):
 
         self.seed = seed
@@ -38,6 +40,7 @@ class Simulation:
         self.heartbeat_interval_ms = heartbeat_interval_ms
         self.node_timeout_range = node_timeout_limits
         self.filters = filters or []
+        self.log_level = log_level
         self.event_emitter = event_emitter or RaftEventEmitter()
 
     def run(self) -> None:
