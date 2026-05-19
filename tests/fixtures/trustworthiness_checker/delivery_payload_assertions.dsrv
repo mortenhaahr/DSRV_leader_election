@@ -1,0 +1,8 @@
+in message_delivered
+in message_received
+
+out delivered_payload_ok: Bool
+out received_payload_ok: Bool
+
+delivered_payload_ok = (Map.get(message_delivered, "event") == "message_delivered") && (Map.get(message_delivered, "msg_id") > 0)
+received_payload_ok = (Map.get(message_received, "event") == "message_received") && (Map.get(message_received, "msg_id") > 0)

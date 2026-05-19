@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
-pytest_plugins = ("dsrv_leader_election.testing.mqtt_test_support",)
+pytest_plugins = (
+    "dsrv_leader_election.testing.mqtt_test_support",
+    "dsrv_leader_election.testing.trustworthiness_checker_test_support",
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -30,10 +33,16 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="run tests marked as simulations",
     )
     parser.addoption(
+        "--test-end-to-end",
+        action="store_true",
+        default=False,
+        help="run tests marked as end_to_end",
+    )
+    parser.addoption(
         "--all-tests",
         action="store_true",
         default=False,
-        help="run all tests including mqtt and simulation_sequence tests",
+        help="run all tests including mqtt, simulation_sequence, and end_to_end tests",
     )
 
 
@@ -43,6 +52,10 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "simulations: marks long simulation sequence tests",
     )
+    config.addinivalue_line(
+        "markers",
+        "end_to_end: marks end-to-end integration tests (e.g. trustworthiness-checker)",
+    )
 
 
 def pytest_collection_modifyitems(
@@ -50,6 +63,7 @@ def pytest_collection_modifyitems(
     items: list[pytest.Item],
 ) -> None:
     run_all_tests = config.getoption("--all-tests")
+    run_end_to_end = run_all_tests or config.getoption("--test-end-to-end")
     run_mqtt = run_all_tests or config.getoption("--test-mqtt")
     run_simulation_sequences = run_all_tests or config.getoption("--test-simulations")
 
@@ -59,9 +73,18 @@ def pytest_collection_modifyitems(
     skip_simseq = pytest.mark.skip(
         reason="need --test-simulations (or --all-tests) option to run"
     )
+    skip_end_to_end = pytest.mark.skip(
+        reason="need --test-end-to-end (or --all-tests) option to run"
+    )
 
     for item in items:
-        if "mqtt" in item.keywords and not run_mqtt:
+        if (
+            "mqtt" in item.keywords
+            and "end_to_end" not in item.keywords
+            and not run_mqtt
+        ):
             item.add_marker(skip_mqtt)
         if "simulations" in item.keywords and not run_simulation_sequences:
             item.add_marker(skip_simseq)
+        if "end_to_end" in item.keywords and not run_end_to_end:
+            item.add_marker(skip_end_to_end)

@@ -1,0 +1,8 @@
+in leader_elected
+in node_role_transition
+
+out leader_payload_ok: Bool
+out transition_to_leader_ok: Bool
+
+leader_payload_ok = (Map.get(leader_elected, "event") == "leader_elected") && (Map.get(leader_elected, "term") > 0)
+transition_to_leader_ok = (Map.get(node_role_transition, "to_role") == "leader") => (Map.get(node_role_transition, "from_role") == "candidate")

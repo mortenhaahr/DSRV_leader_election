@@ -1,0 +1,7 @@
+in node_role_transition
+
+out candidate_to_candidate_seen: Bool
+out leader_stepdown_or_election_seen: Bool
+
+candidate_to_candidate_seen = (Map.get(node_role_transition, "from_role") == "candidate") && (Map.get(node_role_transition, "to_role") == "candidate")
+leader_stepdown_or_election_seen = ((Map.get(node_role_transition, "from_role") == "leader") && (Map.get(node_role_transition, "to_role") == "follower")) || ((Map.get(node_role_transition, "from_role") == "candidate") && (Map.get(node_role_transition, "to_role") == "leader"))

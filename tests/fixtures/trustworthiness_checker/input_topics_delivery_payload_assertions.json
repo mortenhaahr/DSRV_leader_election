@@ -1,0 +1,8 @@
+{
+  "message_delivered": {
+    "topic": "raft/message/delivered"
+  },
+  "message_received": {
+    "topic": "raft/message/received"
+  }
+}

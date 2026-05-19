@@ -122,6 +122,8 @@ def _message_event_sequence(
     return sequence
 
 
+# TC counterparts: test_tc_lifecycle_assertions, test_tc_lifecycle_tick_assertions,
+#                  test_tc_simulation_tick_assertions
 @pytest.mark.parametrize("seed", RANDOM_SEEDS)
 @pytest.mark.parametrize(
     "config_filename",
@@ -165,6 +167,7 @@ def test_example_config_runs_emit_expected_lifecycle_events(
     ), f"seed={seed} config={config_filename} unexpected simulation_finished tick"
 
 
+# No TC counterpart
 def test_message_ids_are_isolated_between_runs() -> None:
     seed = 42
     _, messages_a = _run_config("system_crash.json", seed=seed)
@@ -179,6 +182,7 @@ def test_message_ids_are_isolated_between_runs() -> None:
     assert sequence_b[0][2] == 1, "expected second run to start message ids at 1"
 
 
+# No TC counterpart
 def test_running_same_simulation_instance_twice_raises_runtime_error() -> None:
     simulation, _ = _run_config("system_crash.json", seed=42)
 
@@ -186,6 +190,7 @@ def test_running_same_simulation_instance_twice_raises_runtime_error() -> None:
         simulation.run()
 
 
+# No TC counterpart
 def test_system_crash_exact_message_event_prefix_for_seed_42() -> None:
     seed = 42
     _, messages = _run_config("system_crash.json", seed=seed)
@@ -218,6 +223,7 @@ def test_system_crash_exact_message_event_prefix_for_seed_42() -> None:
 
 
 @pytest.mark.parametrize("seed", RANDOM_SEEDS)
+# TC counterpart: test_tc_system_crash_drop_window_assertions
 def test_system_crash_scenario_drops_messages_only_during_crash_window(
     seed: int,
 ) -> None:
@@ -231,6 +237,7 @@ def test_system_crash_scenario_drops_messages_only_during_crash_window(
 
 
 @pytest.mark.parametrize("seed", RANDOM_SEEDS)
+# TC counterpart: test_tc_leader_crash_assertions
 def test_leader_crash_timed_scenario_causes_re_election_and_latency(seed: int) -> None:
     _, messages = _run_config("leader_crash_timed.json", seed=seed)
 
@@ -259,6 +266,7 @@ def test_leader_crash_timed_scenario_causes_re_election_and_latency(seed: int) -
 
 
 @pytest.mark.parametrize("seed", RANDOM_SEEDS)
+# TC counterpart: test_tc_detailed_filters_assertions
 def test_detailed_filters_scenario_crashes_receiver_2_and_applies_latency(
     seed: int,
 ) -> None:
@@ -309,6 +317,7 @@ def test_detailed_filters_scenario_crashes_receiver_2_and_applies_latency(
         "detailed_filters.json",
     ],
 )
+# TC counterpart: test_tc_delivery_payload_assertions
 def test_received_messages_are_preceded_by_delivery_event(
     config_filename: str,
     seed: int,
@@ -352,6 +361,7 @@ def test_received_messages_are_preceded_by_delivery_event(
         "detailed_filters.json",
     ],
 )
+# TC counterpart: test_tc_leader_crash_assertions (transition_allowed output)
 def test_role_transition_sequences_are_valid_per_node(
     config_filename: str,
     seed: int,
@@ -410,6 +420,7 @@ def test_role_transition_sequences_are_valid_per_node(
         "detailed_filters.json",
     ],
 )
+# TC counterpart: test_tc_leader_transition_assertions
 def test_leader_elected_has_matching_transition_to_leader(
     config_filename: str,
     seed: int,
@@ -447,6 +458,7 @@ def test_leader_elected_has_matching_transition_to_leader(
 
 
 @pytest.mark.parametrize("seed", RANDOM_SEEDS)
+# TC counterpart: test_tc_system_crash_role_transition_presence_assertions
 def test_system_crash_role_transitions(seed: int) -> None:
     _, messages = _run_config("system_crash.json", seed=seed)
 
@@ -464,6 +476,7 @@ def test_system_crash_role_transitions(seed: int) -> None:
 
 
 @pytest.mark.parametrize("seed", RANDOM_SEEDS)
+# TC counterpart: test_tc_leader_crash_transition_presence_assertions
 def test_leader_crash_timed_role_transitions(seed: int) -> None:
     _, messages = _run_config("leader_crash_timed.json", seed=seed)
 
@@ -488,6 +501,7 @@ def test_leader_crash_timed_role_transitions(seed: int) -> None:
 
 
 @pytest.mark.parametrize("seed", RANDOM_SEEDS)
+# TC counterpart: test_tc_detailed_filters_transition_pattern_assertions
 def test_detailed_filters_role_transitions(seed: int) -> None:
     _, messages = _run_config("detailed_filters.json", seed=seed)
 
@@ -522,6 +536,7 @@ def test_detailed_filters_role_transitions(seed: int) -> None:
         "detailed_filters.json",
     ],
 )
+# TC counterparts: test_tc_lifecycle_assertions, test_tc_lifecycle_tick_assertions
 def test_lifecycle_invariants(
     config_filename: str,
     seed: int,
@@ -559,6 +574,7 @@ def test_lifecycle_invariants(
         "detailed_filters.json",
     ],
 )
+# TC counterpart: test_tc_leader_crash_assertions (transition_allowed output)
 def test_transition_consistency(
     config_filename: str,
     seed: int,
@@ -609,6 +625,7 @@ def test_transition_consistency(
         "detailed_filters.json",
     ],
 )
+# No TC counterpart
 def test_transition_ticks_are_non_decreasing_per_node(
     config_filename: str,
     seed: int,
@@ -638,6 +655,7 @@ def test_transition_ticks_are_non_decreasing_per_node(
         "detailed_filters.json",
     ],
 )
+# No TC counterpart
 def test_transition_terms_are_non_decreasing_per_node(
     config_filename: str,
     seed: int,
@@ -667,6 +685,7 @@ def test_transition_terms_are_non_decreasing_per_node(
         "detailed_filters.json",
     ],
 )
+# TC counterpart: test_tc_leader_transition_assertions
 def test_candidate_to_leader_transition_has_matching_leader_elected_event_same_tick(
     config_filename: str,
     seed: int,

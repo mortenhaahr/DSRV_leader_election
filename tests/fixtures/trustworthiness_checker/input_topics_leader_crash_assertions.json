@@ -1,0 +1,14 @@
+{
+  "message_dropped": {
+    "topic": "raft/message/dropped"
+  },
+  "message_delayed": {
+    "topic": "raft/message/delayed"
+  },
+  "leader_elected": {
+    "topic": "raft/node/leader_elected"
+  },
+  "node_role_transition": {
+    "topic": "raft/node/role_transition"
+  }
+}

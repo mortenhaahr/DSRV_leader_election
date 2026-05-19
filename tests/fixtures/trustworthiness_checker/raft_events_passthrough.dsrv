@@ -1,0 +1,11 @@
+in simulation_started
+in simulation_finished
+in leader_elected
+
+out simulation_started_echo
+out simulation_finished_echo
+out leader_elected_echo
+
+simulation_started_echo = simulation_started
+simulation_finished_echo = simulation_finished
+leader_elected_echo = leader_elected

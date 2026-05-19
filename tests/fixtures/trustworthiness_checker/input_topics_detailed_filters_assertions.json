@@ -1,0 +1,8 @@
+{
+  "message_dropped": {
+    "topic": "raft/message/dropped"
+  },
+  "message_delayed": {
+    "topic": "raft/message/delayed"
+  }
+}

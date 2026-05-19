@@ -1,0 +1,8 @@
+{
+  "leader_elected": {
+    "topic": "raft/node/leader_elected"
+  },
+  "node_role_transition": {
+    "topic": "raft/node/role_transition"
+  }
+}

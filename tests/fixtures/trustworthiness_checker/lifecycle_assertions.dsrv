@@ -1,0 +1,11 @@
+in simulation_started
+in simulation_finished
+in node_initialized
+
+out started_ok: Bool
+out finished_ok: Bool
+out node_initialized_ok: Bool
+
+started_ok = Map.get(simulation_started, "event") == "simulation_started"
+finished_ok = Map.get(simulation_finished, "event") == "simulation_finished"
+node_initialized_ok = Map.get(node_initialized, "event") == "node_initialized"

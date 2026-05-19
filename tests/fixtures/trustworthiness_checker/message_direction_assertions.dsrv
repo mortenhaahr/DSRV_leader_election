@@ -1,0 +1,11 @@
+in message_generated
+in message_delivered
+in message_received
+
+out generated_direction_ok: Bool
+out delivered_direction_ok: Bool
+out received_direction_ok: Bool
+
+generated_direction_ok = !(Map.get(message_generated, "sender") == Map.get(message_generated, "receiver"))
+delivered_direction_ok = !(Map.get(message_delivered, "sender") == Map.get(message_delivered, "receiver"))
+received_direction_ok = !(Map.get(message_received, "sender") == Map.get(message_received, "receiver"))

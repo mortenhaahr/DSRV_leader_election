@@ -1,0 +1,5 @@
+in message_dropped
+
+out drop_window_ok: Bool
+
+drop_window_ok = (Map.get(message_dropped, "tick") >= 250) && (Map.get(message_dropped, "tick") < 350)

@@ -1,0 +1,11 @@
+{
+  "simulation_started": {
+    "topic": "raft/simulation/started"
+  },
+  "simulation_finished": {
+    "topic": "raft/simulation/finished"
+  },
+  "leader_elected": {
+    "topic": "raft/node/leader_elected"
+  }
+}

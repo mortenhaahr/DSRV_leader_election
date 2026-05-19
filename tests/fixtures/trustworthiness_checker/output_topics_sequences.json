@@ -1,0 +1,35 @@
+{
+  "simulation_started_echo": {
+    "topic": "tc/out/sequence/simulation_started"
+  },
+  "simulation_tick_echo": {
+    "topic": "tc/out/sequence/simulation_tick"
+  },
+  "simulation_finished_echo": {
+    "topic": "tc/out/sequence/simulation_finished"
+  },
+  "node_initialized_echo": {
+    "topic": "tc/out/sequence/node_initialized"
+  },
+  "node_role_transition_echo": {
+    "topic": "tc/out/sequence/node_role_transition"
+  },
+  "leader_elected_echo": {
+    "topic": "tc/out/sequence/leader_elected"
+  },
+  "message_scheduled_echo": {
+    "topic": "tc/out/sequence/message_scheduled"
+  },
+  "message_delayed_echo": {
+    "topic": "tc/out/sequence/message_delayed"
+  },
+  "message_dropped_echo": {
+    "topic": "tc/out/sequence/message_dropped"
+  },
+  "message_delivered_echo": {
+    "topic": "tc/out/sequence/message_delivered"
+  },
+  "message_received_echo": {
+    "topic": "tc/out/sequence/message_received"
+  }
+}

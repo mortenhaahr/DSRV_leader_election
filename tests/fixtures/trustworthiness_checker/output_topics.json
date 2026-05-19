@@ -1,0 +1,11 @@
+{
+  "simulation_started_echo": {
+    "topic": "tc/out/simulation_started"
+  },
+  "simulation_finished_echo": {
+    "topic": "tc/out/simulation_finished"
+  },
+  "leader_elected_echo": {
+    "topic": "tc/out/leader_elected"
+  }
+}

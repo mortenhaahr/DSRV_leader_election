@@ -1,0 +1,20 @@
+in message_generated
+in message_scheduled
+in message_delivered
+in message_received
+in message_dropped
+in message_delayed
+
+out generated_schema_ok: Bool
+out scheduled_schema_ok: Bool
+out delivered_schema_ok: Bool
+out received_schema_ok: Bool
+out dropped_schema_ok: Bool
+out delayed_schema_ok: Bool
+
+generated_schema_ok = (Map.get(message_generated, "event") == "message_generated") && (Map.get(message_generated, "msg_id") > 0) && (Map.get(message_generated, "tick") >= 0)
+scheduled_schema_ok = (Map.get(message_scheduled, "event") == "message_scheduled") && (Map.get(message_scheduled, "msg_id") > 0) && (Map.get(message_scheduled, "tick") >= 0)
+delivered_schema_ok = (Map.get(message_delivered, "event") == "message_delivered") && (Map.get(message_delivered, "msg_id") > 0) && (Map.get(message_delivered, "tick") >= 0)
+received_schema_ok = (Map.get(message_received, "event") == "message_received") && (Map.get(message_received, "msg_id") > 0) && (Map.get(message_received, "tick") >= 0)
+dropped_schema_ok = (Map.get(message_dropped, "event") == "message_dropped") && (Map.get(message_dropped, "msg_id") > 0) && (Map.get(message_dropped, "tick") >= 0)
+delayed_schema_ok = (Map.get(message_delayed, "event") == "message_delayed") && (Map.get(message_delayed, "msg_id") > 0) && (Map.get(message_delayed, "tick") >= 0)

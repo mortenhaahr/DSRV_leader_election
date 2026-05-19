@@ -1,0 +1,8 @@
+in message_dropped
+in message_delayed
+
+out receiver_two_ok: Bool
+out delayed_event_ok: Bool
+
+receiver_two_ok = Map.get(message_dropped, "receiver") == 2
+delayed_event_ok = Map.get(message_delayed, "event") == "message_delayed"

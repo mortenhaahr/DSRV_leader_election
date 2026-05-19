@@ -23,3 +23,4 @@ Primary goal: implement and evaluate RAFT leader election behavior (not full log
 - MQTT tests require Docker/testcontainers.
 - Simulation tests use dedicated fixtures in `tests/fixtures/` rather than `example_configs/`.
 - Validate every suggested patch with the most appropriate pytest command(s) above.
+- Also ensure that types are used consistently throughout the codebase, and validate patches using type checking / diagnostics.

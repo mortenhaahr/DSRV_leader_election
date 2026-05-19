@@ -1,0 +1,8 @@
+in simulation_started
+in simulation_finished
+
+out started_tick_zero: Bool
+out finished_tick_non_negative: Bool
+
+started_tick_zero = Map.get(simulation_started, "tick") == 0
+finished_tick_non_negative = Map.get(simulation_finished, "tick") >= 0

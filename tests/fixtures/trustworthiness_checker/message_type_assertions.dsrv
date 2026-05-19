@@ -1,0 +1,20 @@
+in message_generated
+in message_scheduled
+in message_delivered
+in message_received
+in message_dropped
+in message_delayed
+
+out generated_type_ok: Bool
+out scheduled_type_ok: Bool
+out delivered_type_ok: Bool
+out received_type_ok: Bool
+out dropped_type_ok: Bool
+out delayed_type_ok: Bool
+
+generated_type_ok = ((Map.get(message_generated, "msg_type") == "RequestVote") || (Map.get(message_generated, "msg_type") == "RequestVoteResponse") || (Map.get(message_generated, "msg_type") == "AppendEntries") || (Map.get(message_generated, "msg_type") == "AppendEntriesResponse"))
+scheduled_type_ok = ((Map.get(message_scheduled, "msg_type") == "RequestVote") || (Map.get(message_scheduled, "msg_type") == "RequestVoteResponse") || (Map.get(message_scheduled, "msg_type") == "AppendEntries") || (Map.get(message_scheduled, "msg_type") == "AppendEntriesResponse"))
+delivered_type_ok = ((Map.get(message_delivered, "msg_type") == "RequestVote") || (Map.get(message_delivered, "msg_type") == "RequestVoteResponse") || (Map.get(message_delivered, "msg_type") == "AppendEntries") || (Map.get(message_delivered, "msg_type") == "AppendEntriesResponse"))
+received_type_ok = ((Map.get(message_received, "msg_type") == "RequestVote") || (Map.get(message_received, "msg_type") == "RequestVoteResponse") || (Map.get(message_received, "msg_type") == "AppendEntries") || (Map.get(message_received, "msg_type") == "AppendEntriesResponse"))
+dropped_type_ok = ((Map.get(message_dropped, "msg_type") == "RequestVote") || (Map.get(message_dropped, "msg_type") == "RequestVoteResponse") || (Map.get(message_dropped, "msg_type") == "AppendEntries") || (Map.get(message_dropped, "msg_type") == "AppendEntriesResponse"))
+delayed_type_ok = ((Map.get(message_delayed, "msg_type") == "RequestVote") || (Map.get(message_delayed, "msg_type") == "RequestVoteResponse") || (Map.get(message_delayed, "msg_type") == "AppendEntries") || (Map.get(message_delayed, "msg_type") == "AppendEntriesResponse"))

@@ -1,0 +1,5 @@
+in simulation_tick
+
+out simulation_tick_ok: Bool
+
+simulation_tick_ok = (Map.get(simulation_tick, "event") == "simulation_tick") && (Map.get(simulation_tick, "tick") >= 0)

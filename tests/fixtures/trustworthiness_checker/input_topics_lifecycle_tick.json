@@ -1,0 +1,8 @@
+{
+  "simulation_started": {
+    "topic": "raft/simulation/started"
+  },
+  "simulation_finished": {
+    "topic": "raft/simulation/finished"
+  }
+}

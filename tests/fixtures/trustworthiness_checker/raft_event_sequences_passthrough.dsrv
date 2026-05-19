@@ -1,0 +1,35 @@
+in simulation_started
+in simulation_tick
+in simulation_finished
+in node_initialized
+in node_role_transition
+in leader_elected
+in message_scheduled
+in message_delayed
+in message_dropped
+in message_delivered
+in message_received
+
+out simulation_started_echo
+out simulation_tick_echo
+out simulation_finished_echo
+out node_initialized_echo
+out node_role_transition_echo
+out leader_elected_echo
+out message_scheduled_echo
+out message_delayed_echo
+out message_dropped_echo
+out message_delivered_echo
+out message_received_echo
+
+simulation_started_echo = simulation_started
+simulation_tick_echo = simulation_tick
+simulation_finished_echo = simulation_finished
+node_initialized_echo = node_initialized
+node_role_transition_echo = node_role_transition
+leader_elected_echo = leader_elected
+message_scheduled_echo = message_scheduled
+message_delayed_echo = message_delayed
+message_dropped_echo = message_dropped
+message_delivered_echo = message_delivered
+message_received_echo = message_received

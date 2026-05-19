@@ -1,0 +1,14 @@
+in message_dropped
+in message_delayed
+in leader_elected
+in node_role_transition
+
+out drop_window_ok: Bool
+out delayed_event_ok: Bool
+out leader_elected_event_ok: Bool
+out transition_allowed: Bool
+
+drop_window_ok = (Map.get(message_dropped, "tick") >= 250) && (Map.get(message_dropped, "tick") < 550)
+delayed_event_ok = Map.get(message_delayed, "event") == "message_delayed"
+leader_elected_event_ok = Map.get(leader_elected, "event") == "leader_elected"
+transition_allowed = (((Map.get(node_role_transition, "from_role") == "follower") && (Map.get(node_role_transition, "to_role") == "candidate")) || ((Map.get(node_role_transition, "from_role") == "candidate") && (Map.get(node_role_transition, "to_role") == "leader")) || ((Map.get(node_role_transition, "from_role") == "candidate") && (Map.get(node_role_transition, "to_role") == "follower")) || ((Map.get(node_role_transition, "from_role") == "candidate") && (Map.get(node_role_transition, "to_role") == "candidate")) || ((Map.get(node_role_transition, "from_role") == "leader") && (Map.get(node_role_transition, "to_role") == "follower")))
