@@ -14,11 +14,18 @@ class MqttLoggerException(Exception): ...
 
 @dataclass
 class MqttLogger(EventLogger):
-    def __init__(self, broker: str, port: int, topic_mapping: TopicMapping):
+    def __init__(
+        self,
+        broker: str,
+        port: int,
+        topic_mapping: TopicMapping,
+        publish_qos: int = 1,
+    ):
         super().__init__(topic_mapping)
         self._client: mqtt.Client = mqtt.Client(
             callback_api_version=CallbackAPIVersion.VERSION2
         )
+        self._publish_qos: int = publish_qos
 
         connect_res = self._client.connect(broker, port)
         if connect_res != MQTTErrorCode.MQTT_ERR_SUCCESS:
@@ -37,7 +44,7 @@ class MqttLogger(EventLogger):
     def emit(self, var: VarName, value: TypedTCData) -> None:
         topic = self.topic_mapping[var]
         json_value = value.to_json()
-        mqtt_msg_info = self._client.publish(topic, json_value)
+        mqtt_msg_info = self._client.publish(topic, json_value, qos=self._publish_qos)
         mqtt_msg_info.wait_for_publish(timeout=2.0)
         if not mqtt_msg_info.is_published():
             raise MqttLoggerException("Failed to publish MQTT message")
