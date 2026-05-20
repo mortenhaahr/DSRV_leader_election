@@ -72,6 +72,23 @@ def _transition_payloads(messages: list[EmittedLogMessage]) -> list[dict[str, TC
     return _event_payloads(messages, "node_role_transition")
 
 
+def _all_payloads(
+    messages: list[EmittedLogMessage],
+) -> list[dict[str, TCData]]:
+    """Return every event payload in emission order, preserving interleaving.
+
+    Unlike the type-filtered helpers, this preserves the relative ordering of
+    node_role_transition and message_generated events within the same tick,
+    which is required to correctly correlate a node's current role with the
+    messages it produces.
+    """
+    return [
+        message.value.data
+        for message in messages
+        if isinstance(message.value.data, dict)
+    ]
+
+
 def _transition_sequence(
     messages: list[EmittedLogMessage],
 ) -> list[tuple[int, int, str, str, int]]:
@@ -718,4 +735,136 @@ def test_candidate_to_leader_transition_has_matching_leader_elected_event_same_t
     assert transition_to_leader_keys.issubset(leader_elected_keys), (
         f"seed={seed} config={config_filename} expected leader_elected event for each "
         "candidate->leader transition"
+    )
+
+
+@pytest.mark.parametrize("seed", RANDOM_SEEDS)
+@pytest.mark.parametrize(
+    "config_filename",
+    [
+        "system_crash.json",
+        "leader_crash_timed.json",
+        "detailed_filters.json",
+    ],
+)
+# TC counterpart: test_tc_role_specific_behavior
+def test_role_specific_behavior_per_role(
+    config_filename: str,
+    seed: int,
+) -> None:
+    """Check one key responsibility per role, using from_role as the discriminator.
+
+    - Follower  (FR-4): a follower's only valid exit is to become a candidate.
+    - Candidate (CR-1): a candidate always operates in a strictly positive term.
+    - Leader    (LR-4): a leader's only valid exit is to step down to follower.
+    """
+    _, messages = _run_config(config_filename, seed=seed)
+
+    transitions = _transition_payloads(messages)
+    assert transitions, (
+        f"seed={seed} config={config_filename} expected at least one role transition"
+    )
+
+    for payload in transitions:
+        from_role = str(payload["from_role"])
+        to_role = str(payload["to_role"])
+        term = coerce_int(payload["term"], "term")
+        node_id = coerce_int(payload["node_id"], "node_id")
+        tick = coerce_int(payload["tick"], "tick")
+
+        if from_role == "follower":
+            # FR-4: a follower's only exit is to become a candidate (election timeout)
+            assert to_role == "candidate", (
+                f"seed={seed} config={config_filename} node={node_id} tick={tick}: "
+                f"follower must exit to candidate, got {to_role!r}"
+            )
+        elif from_role == "candidate":
+            # CR-1: a candidate always operates in a strictly positive term
+            assert term > 0, (
+                f"seed={seed} config={config_filename} node={node_id} tick={tick}: "
+                f"candidate must have term > 0, got term={term}"
+            )
+        elif from_role == "leader":
+            # LR-4: a leader's only exit is to step down to follower
+            assert to_role == "follower", (
+                f"seed={seed} config={config_filename} node={node_id} tick={tick}: "
+                f"leader must exit to follower, got {to_role!r}"
+            )
+        else:
+            pytest.fail(
+                f"seed={seed} config={config_filename} node={node_id} tick={tick}: unknown from_role {from_role!r}"
+            )
+
+
+@pytest.mark.parametrize("seed", RANDOM_SEEDS)
+@pytest.mark.parametrize(
+    "config_filename",
+    [
+        "system_crash.json",
+        "leader_crash_timed.json",
+        "detailed_filters.json",
+    ],
+)
+# TC counterpart: test_tc_node_specific_behavior
+def test_node_0_message_types_per_role(
+    config_filename: str,
+    seed: int,
+) -> None:
+    """Check that node 0 only generates messages appropriate to its current role.
+
+    Events are walked in emission order so that every node_role_transition for
+    node 0 is processed before the message_generated events that follow it
+    within the same tick, giving an accurate picture of the role at the time
+    each message was produced.
+
+    - Follower  (FR-5): only sends RequestVoteResponse / AppendEntriesResponse;
+                        never initiates elections (RequestVote) or heartbeats
+                        (AppendEntries).
+    - Candidate (CR-3): sends RequestVote and response messages; never sends
+                        AppendEntries because it is not yet a leader.
+    - Leader    (LR-2): sends AppendEntries and response messages; never sends
+                        RequestVote because it does not run as a candidate.
+    """
+    _, messages = _run_config(config_filename, seed=seed)
+
+    node_0_role = "follower"  # all nodes start as followers
+    node_0_messages_seen = False
+
+    for payload in _all_payloads(messages):
+        event = str(payload.get("event", ""))
+        raw_node_id = payload.get("node_id")
+        if raw_node_id is None:
+            continue
+        node_id = coerce_int(raw_node_id, "node_id")
+
+        if event == "node_role_transition" and node_id == 0:
+            node_0_role = str(payload["to_role"])
+
+        elif event == "message_generated" and node_id == 0:
+            node_0_messages_seen = True
+            msg_type = str(payload.get("msg_type", ""))
+            tick = coerce_int(payload.get("tick"), "tick")
+
+            if node_0_role == "follower":
+                # FR-5: follower never initiates an election or heartbeat
+                assert msg_type not in {"RequestVote", "AppendEntries"}, (
+                    f"seed={seed} config={config_filename} tick={tick}: follower node 0 generated {msg_type!r}"
+                )
+            elif node_0_role == "candidate":
+                # CR-3: candidate solicits votes but never sends heartbeats
+                assert msg_type != "AppendEntries", (
+                    f"seed={seed} config={config_filename} tick={tick}: candidate node 0 generated {msg_type!r}"
+                )
+            elif node_0_role == "leader":
+                # LR-2: leader sends heartbeats but never solicits votes
+                assert msg_type != "RequestVote", (
+                    f"seed={seed} config={config_filename} tick={tick}: leader node 0 generated {msg_type!r}"
+                )
+            else:
+                pytest.fail(
+                    f"seed={seed} config={config_filename} tick={tick}: node 0 in unknown role {node_0_role!r}"
+                )
+
+    assert node_0_messages_seen, (
+        f"seed={seed} config={config_filename}: expected at least one message_generated from node 0"
     )

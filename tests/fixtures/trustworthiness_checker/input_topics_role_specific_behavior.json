@@ -1,0 +1,5 @@
+{
+  "node_role_transition": {
+    "topic": "raft/node/role_transition"
+  }
+}

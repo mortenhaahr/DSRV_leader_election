@@ -1,0 +1,8 @@
+{
+  "node_role_transition": {
+    "topic": "raft/node/role_transition"
+  },
+  "message_generated": {
+    "topic": "raft/message/generated"
+  }
+}

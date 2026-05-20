@@ -197,3 +197,66 @@ def test_tc_simulation_tick_assertions(
     with mqtt_subscriber_factory("simulation_tick_ok") as simulation_tick_ok:
         _run_simulation(broker=broker, port=port, config_filename=config_filename)
         _assert_all_true(simulation_tick_ok, timeout_s=ASSERTION_TIMEOUT_S)
+
+
+# event_sequences counterpart: test_role_specific_behavior_per_role
+def test_tc_role_specific_behavior(
+    config_filename: str,
+    mqtt_broker: tuple[str, int],
+    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
+    trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
+) -> None:
+    """TC counterpart to test_role_specific_behavior_per_role.
+
+    Runs the role_specific_behavior_assertions spec against live MQTT events and
+    asserts that every emitted role_behavior_ok output is True.
+
+    The spec checks one key responsibility per role using an if-else chain on
+    from_role in node_role_transition events:
+      - follower  (FR-4): only exits to candidate
+      - candidate (CR-1): always operates in term > 0
+      - leader    (LR-4): only exits to follower
+    """
+    _ = _start_checker(
+        trustworthiness_checker_container_factory,
+        "/tc-fixtures/role_specific_behavior_assertions.dsrv",
+        "/tc-fixtures/input_topics_role_specific_behavior.json",
+    )
+
+    broker, port = mqtt_broker
+    with mqtt_subscriber_factory("role_behavior_ok") as role_behavior_ok:
+        _run_simulation(broker=broker, port=port, config_filename=config_filename)
+        _assert_all_true(role_behavior_ok, timeout_s=ASSERTION_TIMEOUT_S)
+
+
+# event_sequences counterpart: test_node_0_message_types_per_role
+def test_tc_node_specific_behavior(
+    config_filename: str,
+    mqtt_broker: tuple[str, int],
+    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
+    trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
+) -> None:
+    """TC counterpart to test_node_0_message_types_per_role.
+
+    Tracks node 0's role via an auxiliary variable updated on
+    node_role_transition events, then checks every message_generated event
+    from node 0 against the allowed message types for that role:
+
+      - follower  (FR-5): never RequestVote or AppendEntries
+      - candidate (CR-3): never AppendEntries
+      - leader    (LR-2): never RequestVote
+
+    The spec uses is_defined() to guard stream-specific access and
+    default() with past-indexing to carry the role forward between
+    node_role_transition events.
+    """
+    _ = _start_checker(
+        trustworthiness_checker_container_factory,
+        "/tc-fixtures/node_specific_behavior_assertions.dsrv",
+        "/tc-fixtures/input_topics_node_specific_behavior.json",
+    )
+
+    broker, port = mqtt_broker
+    with mqtt_subscriber_factory("role_behavior_ok") as role_behavior_ok:
+        _run_simulation(broker=broker, port=port, config_filename=config_filename)
+        _assert_all_true(role_behavior_ok, timeout_s=ASSERTION_TIMEOUT_S)
