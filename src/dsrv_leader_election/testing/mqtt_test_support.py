@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import queue as _queue
 import re
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Protocol, SupportsInt, runtime_checkable
 
 import paho.mqtt.client as mqtt
@@ -26,21 +27,6 @@ def _connect_succeeded(reason_code: object) -> bool:
     if isinstance(reason_code, SupportsInt):
         return int(reason_code) == 0
     return False
-
-
-def assert_eventually(
-    predicate: Callable[[], bool],
-    *,
-    timeout_s: float = 3.0,
-    interval_s: float = 0.05,
-    message: str = "Condition was not met in time",
-) -> None:
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        if predicate():
-            return
-        time.sleep(interval_s)
-    assert predicate(), message
 
 
 @pytest.fixture(scope="module")
@@ -67,19 +53,17 @@ def mqtt_broker(mqtt_container: DockerContainer) -> tuple[str, int]:
     )
 
 
-@pytest.fixture
-def mqtt_subscriber_factory(
-    request: pytest.FixtureRequest, mqtt_broker: tuple[str, int]
-) -> Callable[[str], list[str]]:
-    broker, port = mqtt_broker
-    subscribers: list[mqtt.Client] = []
+class MqttMessageStream:
+    """Context manager that subscribes to an MQTT topic and provides a blocking iterator over messages."""
 
-    def make_subscriber(topic: str) -> list[str]:
-        received_payloads: list[str] = []
+    def __init__(self, broker: str, port: int, topic: str) -> None:
+        self._queue: _queue.Queue[str | None] = _queue.Queue()
         connected = threading.Event()
         subscribed = threading.Event()
 
-        subscriber = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
+        self._client: mqtt.Client = mqtt.Client(
+            callback_api_version=CallbackAPIVersion.VERSION2
+        )
 
         def on_connect(
             client: mqtt.Client,
@@ -106,27 +90,73 @@ def mqtt_subscriber_factory(
         def on_message(
             _client: mqtt.Client, _userdata: object, msg: mqtt.MQTTMessage
         ) -> None:
-            received_payloads.append(msg.payload.decode("utf-8"))
+            self._queue.put(msg.payload.decode("utf-8"))
 
-        subscriber.on_connect = on_connect
-        subscriber.on_subscribe = on_subscribe
-        subscriber.on_message = on_message
+        self._client.on_connect = on_connect
+        self._client.on_subscribe = on_subscribe
+        self._client.on_message = on_message
 
-        connect_res = subscriber.connect(broker, port)
+        connect_res = self._client.connect(broker, port)
         assert connect_res == 0
-        _ = subscriber.loop_start()
+        _ = self._client.loop_start()
 
         assert connected.wait(timeout=3.0), "Subscriber did not connect in time"
         assert subscribed.wait(timeout=3.0), "Subscriber did not subscribe in time"
 
-        subscribers.append(subscriber)
-        return received_payloads
+    def __enter__(self) -> "MqttMessageStream":
+        return self
 
-    def cleanup() -> None:
-        for subscriber in subscribers:
-            _ = subscriber.loop_stop()
-            _ = subscriber.disconnect()
+    def __exit__(self, *_args: object) -> None:
+        self._queue.put(None)  # unblock any blocked receive()
+        _rc1 = self._client.loop_stop()
+        _rc2 = self._client.disconnect()
 
-    request.addfinalizer(cleanup)
+    def receive(
+        self,
+        *,
+        timeout_s: float = 3.0,
+        idle_timeout_s: float | None = None,
+    ) -> Iterator[str]:
+        """Yield messages as they arrive.
 
-    return make_subscriber
+        Stops when ``timeout_s`` elapses from the start of the call, or when
+        no message has arrived within ``idle_timeout_s`` after the most recent
+        one (whichever occurs first). ``idle_timeout_s`` is useful after the
+        publisher has already finished so that receive returns quickly rather
+        than waiting for the full ``timeout_s``.
+        """
+        now = time.time()
+        deadline = now + timeout_s
+        idle_deadline = now + idle_timeout_s if idle_timeout_s is not None else None
+
+        while True:
+            now = time.time()
+            remaining = deadline - now
+            if remaining <= 0:
+                return
+            if idle_deadline is not None and now >= idle_deadline:
+                return
+            poll = min(remaining, 0.1)
+            if idle_deadline is not None:
+                poll = min(poll, max(idle_deadline - now, 0.0))
+            try:
+                item = self._queue.get(timeout=poll)
+            except _queue.Empty:
+                continue
+            if item is None:
+                return
+            if idle_timeout_s is not None:
+                idle_deadline = time.time() + idle_timeout_s
+            yield item
+
+
+@pytest.fixture
+def mqtt_subscriber_factory(
+    mqtt_broker: tuple[str, int],
+) -> Callable[[str], "MqttMessageStream"]:
+    broker, port = mqtt_broker
+
+    def make_stream(topic: str) -> MqttMessageStream:
+        return MqttMessageStream(broker, port, topic)
+
+    return make_stream

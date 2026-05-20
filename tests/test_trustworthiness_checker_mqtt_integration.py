@@ -10,11 +10,11 @@ import pytest
 from dsrv_leader_election.config_loader import load_simulation_from_file
 from dsrv_leader_election.event_logger.mqtt_logger import MqttLogger
 from dsrv_leader_election.event_logger.raft_event_emitter import RaftEventEmitter
-from dsrv_leader_election.testing.mqtt_test_support import assert_eventually
+from dsrv_leader_election.testing.mqtt_test_support import MqttMessageStream
 from dsrv_leader_election.testing.trustworthiness_checker_test_support import (
     await_checker_ready,
     decode_checker_payload,
-    load_example_topic_mapping
+    load_example_topic_mapping,
 )
 
 pytestmark = [pytest.mark.mqtt, pytest.mark.end_to_end]
@@ -22,13 +22,15 @@ pytestmark = [pytest.mark.mqtt, pytest.mark.end_to_end]
 EVENT_WAIT_TIMEOUT_S = 6.0
 
 
-def _decoded_event_payloads(
-    payloads: list[str],
+def _collect_event_payloads(
+    stream: MqttMessageStream,
     event_name: str,
+    *,
+    timeout_s: float,
 ) -> list[dict[str, object]]:
     decoded: list[dict[str, object]] = []
-    for payload in payloads:
-        value = decode_checker_payload(payload)
+    for raw in stream.receive(timeout_s=timeout_s):
+        value = decode_checker_payload(raw)
         if isinstance(value, dict):
             value_dict = cast(dict[str, object], value)
             if value_dict.get("event") == event_name:
@@ -49,14 +51,10 @@ def trustworthiness_checker_container(
 
 def test_trustworthiness_checker_receives_simulation_lifecycle_events_via_mqtt(
     mqtt_broker: tuple[str, int],
-    mqtt_subscriber_factory: Callable[[str], list[str]],
+    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
     trustworthiness_checker_container: object,
 ) -> None:
     broker, port = mqtt_broker
-
-    started_echo_payloads = mqtt_subscriber_factory("tc/out/simulation_started")
-    finished_echo_payloads = mqtt_subscriber_factory("tc/out/simulation_finished")
-
     await_checker_ready(trustworthiness_checker_container)
 
     logger = MqttLogger(
@@ -69,26 +67,18 @@ def test_trustworthiness_checker_receives_simulation_lifecycle_events_via_mqtt(
         event_emitter=RaftEventEmitter(logger),
     )
 
-    simulation.run()
+    with (
+        mqtt_subscriber_factory("tc/out/simulation_started") as started_stream,
+        mqtt_subscriber_factory("tc/out/simulation_finished") as finished_stream,
+    ):
+        simulation.run()
 
-    assert_eventually(
-        lambda: bool(started_echo_payloads),
-        timeout_s=EVENT_WAIT_TIMEOUT_S,
-        message="Expected checker output for simulation_started event",
-    )
-    assert_eventually(
-        lambda: bool(finished_echo_payloads),
-        timeout_s=EVENT_WAIT_TIMEOUT_S,
-        message="Expected checker output for simulation_finished event",
-    )
-
-    started_values = _decoded_event_payloads(
-        started_echo_payloads, "simulation_started"
-    )
-    finished_values = _decoded_event_payloads(
-        finished_echo_payloads,
-        "simulation_finished",
-    )
+        started_values = _collect_event_payloads(
+            started_stream, "simulation_started", timeout_s=EVENT_WAIT_TIMEOUT_S
+        )
+        finished_values = _collect_event_payloads(
+            finished_stream, "simulation_finished", timeout_s=EVENT_WAIT_TIMEOUT_S
+        )
 
     assert started_values, "Expected at least one simulation_started payload"
     assert finished_values, "Expected at least one simulation_finished payload"
@@ -96,13 +86,10 @@ def test_trustworthiness_checker_receives_simulation_lifecycle_events_via_mqtt(
 
 def test_trustworthiness_checker_receives_leader_elected_events_via_mqtt(
     mqtt_broker: tuple[str, int],
-    mqtt_subscriber_factory: Callable[[str], list[str]],
+    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
     trustworthiness_checker_container: object,
 ) -> None:
     broker, port = mqtt_broker
-
-    leader_elected_echo_payloads = mqtt_subscriber_factory("tc/out/leader_elected")
-
     await_checker_ready(trustworthiness_checker_container)
 
     logger = MqttLogger(
@@ -115,18 +102,14 @@ def test_trustworthiness_checker_receives_leader_elected_events_via_mqtt(
         event_emitter=RaftEventEmitter(logger),
     )
 
-    simulation.run()
+    with mqtt_subscriber_factory("tc/out/leader_elected") as leader_stream:
+        simulation.run()
 
-    assert_eventually(
-        lambda: len(leader_elected_echo_payloads) >= 1,
-        timeout_s=EVENT_WAIT_TIMEOUT_S,
-        message="Expected checker output for leader_elected events",
-    )
+        decoded_payloads: list[dict[str, object]] = []
+        for raw in leader_stream.receive(timeout_s=EVENT_WAIT_TIMEOUT_S):
+            value = decode_checker_payload(raw)
+            assert isinstance(value, dict)
+            decoded_payloads.append(cast(dict[str, object], value))
 
-    decoded_payloads: list[dict[str, object]] = []
-    for payload in leader_elected_echo_payloads:
-        value = decode_checker_payload(payload)
-        assert isinstance(value, dict)
-        decoded_payloads.append(cast(dict[str, object], value))
-
+    assert decoded_payloads, "Expected checker output for leader_elected events"
     assert all(payload.get("event") == "leader_elected" for payload in decoded_payloads)
