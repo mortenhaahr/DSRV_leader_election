@@ -158,6 +158,26 @@ def test_tc_lifecycle_tick_assertions(
         _assert_all_true(finished_tick_non_negative, timeout_s=ASSERTION_TIMEOUT_S)
 
 
+# event_sequences counterpart: test_lifecycle_invariants
+# Checks that simulation_tick values increment by 1 on every consecutive sample.
+# Uses DSRV past-indexing: tick[1] is the previous tick value; the first sample
+# always passes (no history yet), all subsequent samples check tick >= prev + 1.
+def test_tc_tick_increasing(
+    config_filename: str,
+    mqtt_broker: tuple[str, int],
+    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
+    trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
+) -> None:
+    _ = _start_checker(
+        trustworthiness_checker_container_factory,
+        "/tc-fixtures/lifecycle_increasing.dsrv",
+        "/tc-fixtures/lifecycle_increasing.json",
+    )
+
+    broker, port = mqtt_broker
+    with mqtt_subscriber_factory("increasing") as stream:
+        _run_simulation(broker=broker, port=port, config_filename=config_filename)
+        _assert_all_true(stream, timeout_s=ASSERTION_TIMEOUT_S)
 
 
 # event_sequences counterpart: test_example_config_runs_emit_expected_lifecycle_events

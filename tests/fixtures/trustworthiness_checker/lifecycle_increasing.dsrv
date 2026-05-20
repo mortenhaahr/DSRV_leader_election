@@ -1,0 +1,7 @@
+in simulation_tick
+
+aux tick
+out increasing
+
+tick = Map.get(simulation_tick, "tick")
+increasing = if is_defined(tick[1]) then (tick == tick[1] + 1) else true
