@@ -213,9 +213,9 @@ def test_tc_role_specific_behavior(
 
     The spec checks one key responsibility per role using an if-else chain on
     from_role in node_role_transition events:
-      - follower  (FR-4): only exits to candidate
-      - candidate (CR-1): always operates in term > 0
-      - leader    (LR-4): only exits to follower
+      - follower:   only exits to candidate
+      - candidate:  always operates in term > 0
+      - leader:     only exits to follower
     """
     _ = _start_checker(
         trustworthiness_checker_container_factory,
@@ -238,17 +238,18 @@ def test_tc_node_specific_behavior(
 ) -> None:
     """TC counterpart to test_node_0_message_types_per_role.
 
-    Tracks node 0's role via an auxiliary variable updated on
-    node_role_transition events, then checks every message_generated event
-    from node 0 against the allowed message types for that role:
+    The simulation emits every node-specific event on both the shared generic
+    topic and a per-node topic (e.g. raft/node/role_transition/0).  This test
+    uses only the per-node topics for node 0, so the checker receives an
+    already-filtered stream and needs no node_id guard.
 
-      - follower  (FR-5): never RequestVote or AppendEntries
-      - candidate (CR-3): never AppendEntries
-      - leader    (LR-2): never RequestVote
+    The spec tracks node 0's role via an auxiliary variable updated on
+    node_role_transition_node_0 events, then checks every
+    message_generated_node_0 event against the allowed message types:
 
-    The spec uses is_defined() to guard stream-specific access and
-    default() with past-indexing to carry the role forward between
-    node_role_transition events.
+      - follower:   never RequestVote or AppendEntries
+      - candidate:  never AppendEntries
+      - leader:     never RequestVote
     """
     _ = _start_checker(
         trustworthiness_checker_container_factory,
@@ -260,3 +261,162 @@ def test_tc_node_specific_behavior(
     with mqtt_subscriber_factory("role_behavior_ok") as role_behavior_ok:
         _run_simulation(broker=broker, port=port, config_filename=config_filename)
         _assert_all_true(role_behavior_ok, timeout_s=ASSERTION_TIMEOUT_S)
+
+
+# event_sequences counterpart: test_node_0_role_history_matches_transition_from_role
+def test_tc_node_0_role_history(
+    config_filename: str,
+    mqtt_broker: tuple[str, int],
+    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
+    trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
+) -> None:
+    """TC counterpart to test_node_0_role_history_matches_transition_from_role.
+
+    Subscribes exclusively to the per-node topic raft/node/role_transition/0.
+    For each arriving transition event the spec checks:
+
+      - First event (no [1] predecessor): from_role == 'follower'.
+      - All subsequent events: from_role == to_role of the previous event,
+        verified using DSRV past-indexing (node_role_transition_node_0[1]).
+    """
+    _ = _start_checker(
+        trustworthiness_checker_container_factory,
+        "/tc-fixtures/node_role_history_assertions.dsrv",
+        "/tc-fixtures/input_topics_node_role_history.json",
+    )
+
+    broker, port = mqtt_broker
+    with mqtt_subscriber_factory("role_history_ok") as role_history_ok:
+        _run_simulation(broker=broker, port=port, config_filename=config_filename)
+        # allow_empty=True: node 0 may stay a follower for the whole simulation
+        # in some scenarios, producing no role_history_ok outputs at all.
+        _assert_all_true(
+            role_history_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )
+
+
+# event_sequences counterpart: test_node_0_per_message_behavior
+def test_tc_node_0_per_message_behavior(
+    config_filename: str,
+    mqtt_broker: tuple[str, int],
+    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
+    trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
+) -> None:
+    """TC counterpart to test_node_0_per_message_behavior.
+
+    Uses node_per_message_behavior_assertions.dsrv.  Each message_generated
+    event carries a 'role' field so the spec is single-stream and stateless:
+    no past-indexing, no auxiliary variables.
+
+      - follower_ok:  no RequestVote/AppendEntries; term > 0.
+      - candidate_ok: no AppendEntries; term > 0.
+      - leader_ok:    no RequestVote; term > 0.
+      - node_0_ok:    conjunction of the three.
+    """
+    _ = _start_checker(
+        trustworthiness_checker_container_factory,
+        "/tc-fixtures/node_per_message_behavior_assertions.dsrv",
+        "/tc-fixtures/input_topics_node_specific_behavior.json",
+    )
+
+    broker, port = mqtt_broker
+    with (
+        mqtt_subscriber_factory("follower_ok") as follower_ok,
+        mqtt_subscriber_factory("candidate_ok") as candidate_ok,
+        mqtt_subscriber_factory("leader_ok") as leader_ok,
+        mqtt_subscriber_factory("node_0_ok") as node_0_ok,
+    ):
+        _run_simulation(broker=broker, port=port, config_filename=config_filename)
+        _assert_all_true(follower_ok, timeout_s=ASSERTION_TIMEOUT_S)
+        _assert_all_true(candidate_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True)
+        _assert_all_true(leader_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True)
+        _assert_all_true(node_0_ok, timeout_s=ASSERTION_TIMEOUT_S)
+
+
+# event_sequences counterpart: test_node_0_historic_behavior
+def test_tc_node_0_historic_behavior(
+    config_filename: str,
+    mqtt_broker: tuple[str, int],
+    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
+    trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
+) -> None:
+    """TC counterpart to test_node_0_historic_behavior.
+
+    Uses node_historic_behavior_assertions.dsrv.  [1] past-indexing compares
+    each message to its predecessor on the per-node stream.  On the first
+    message [1] is Deferred and no output is produced.
+
+      - follower_term_ok:      consecutive follower messages have non-decreasing term.
+      - candidate_broadcast_ok: consecutive same-election RequestVotes target
+                                different receivers.
+      - leader_broadcast_ok:   consecutive same-epoch AppendEntries target
+                                different receivers.
+      - node_0_ok:             conjunction of the three.
+
+    allow_empty=True is used where the antecedent may never be satisfied
+    (e.g. node 0 stays a follower the whole simulation, or sends only one
+    message before the simulation ends).
+    """
+    _ = _start_checker(
+        trustworthiness_checker_container_factory,
+        "/tc-fixtures/node_historic_behavior_assertions.dsrv",
+        "/tc-fixtures/input_topics_node_specific_behavior.json",
+    )
+
+    broker, port = mqtt_broker
+    with (
+        mqtt_subscriber_factory("follower_term_ok") as follower_term_ok,
+        mqtt_subscriber_factory("candidate_broadcast_ok") as candidate_broadcast_ok,
+        mqtt_subscriber_factory("leader_broadcast_ok") as leader_broadcast_ok,
+        mqtt_subscriber_factory("node_0_ok") as node_0_ok,
+    ):
+        _run_simulation(broker=broker, port=port, config_filename=config_filename)
+        _assert_all_true(
+            follower_term_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )
+        _assert_all_true(
+            candidate_broadcast_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )
+        _assert_all_true(
+            leader_broadcast_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )
+        _assert_all_true(node_0_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True)
+
+
+def test_tc_map_get_on_deferred_now_works(
+    config_filename: str,
+    mqtt_broker: tuple[str, int],
+    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
+    trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
+) -> None:
+    """Verifies that Map.get on a past-indexed stream no longer crashes the TC.
+
+    The spec (node_role_history_map_get_deferred.dsrv) uses:
+
+        if is_defined(node_role_transition_node_0[1]) then
+            Map.get(node_role_transition_node_0[1], "to_role")
+
+    This previously crashed the TC at startup because stream_lift1 did not
+    short-circuit on Deferred inputs before invoking Map.get's inner function.
+
+    TC fix (commit 8430d5e):
+      - stream_lift1/stream_lift2 now propagate Deferred before calling the
+        inner function, so Map.get(Deferred, key) returns Deferred safely.
+      - if_stm now selects only the matching branch's result, so Deferred from
+        a non-selected branch no longer reaches the output.
+
+    The spec is semantically identical to node_role_history_assertions.dsrv;
+    this test exists solely to confirm the TC fix holds end-to-end.
+    """
+    _ = _start_checker(
+        trustworthiness_checker_container_factory,
+        "/tc-fixtures/node_role_history_map_get_deferred.dsrv",
+        "/tc-fixtures/input_topics_node_role_history.json",
+    )
+
+    broker, port = mqtt_broker
+    with mqtt_subscriber_factory("role_history_ok") as role_history_ok:
+        _run_simulation(broker=broker, port=port, config_filename=config_filename)
+        _assert_all_true(
+            role_history_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )

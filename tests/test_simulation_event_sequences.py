@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -22,6 +23,11 @@ from dsrv_leader_election.simulation import Simulation
 pytestmark = pytest.mark.simulations
 
 RANDOM_SEEDS = [1, 7, 42, 333, 1356, 986751, 798942, 233354, 396725, 845406]
+
+# Matches per-node var names such as "node_role_transition_node_0" or
+# "message_generated_node_1".  Used to exclude the duplicated per-node
+# emissions from helpers that should only see the generic event stream.
+_PER_NODE_VAR_RE = re.compile(r"_node_\d+$")
 
 
 def _run_config(
@@ -49,6 +55,8 @@ def _event_payloads(
 ) -> list[dict[str, TCData]]:
     payloads: list[dict[str, TCData]] = []
     for message in messages:
+        if _PER_NODE_VAR_RE.search(message.var):
+            continue
         data = message.value.data
         if isinstance(data, dict):
             event_value = data.get("event")
@@ -60,6 +68,8 @@ def _event_payloads(
 def _event_counts(messages: list[EmittedLogMessage]) -> Counter[str]:
     counts: Counter[str] = Counter()
     for message in messages:
+        if _PER_NODE_VAR_RE.search(message.var):
+            continue
         data = message.value.data
         if isinstance(data, dict):
             event_name = data.get("event")
@@ -86,6 +96,7 @@ def _all_payloads(
         message.value.data
         for message in messages
         if isinstance(message.value.data, dict)
+        and not _PER_NODE_VAR_RE.search(message.var)
     ]
 
 
@@ -111,6 +122,8 @@ def _message_event_sequence(
 ) -> list[tuple[str, str, int, int, int, int]]:
     sequence: list[tuple[str, str, int, int, int, int]] = []
     for message in messages:
+        if _PER_NODE_VAR_RE.search(message.var):
+            continue
         data = message.value.data
         if not isinstance(data, dict):
             continue
@@ -754,9 +767,9 @@ def test_role_specific_behavior_per_role(
 ) -> None:
     """Check one key responsibility per role, using from_role as the discriminator.
 
-    - Follower  (FR-4): a follower's only valid exit is to become a candidate.
-    - Candidate (CR-1): a candidate always operates in a strictly positive term.
-    - Leader    (LR-4): a leader's only valid exit is to step down to follower.
+    - Follower:   only valid exit is to become a candidate.
+    - Candidate:  always operates in a strictly positive term.
+    - Leader:     only valid exit is to step down to follower.
     """
     _, messages = _run_config(config_filename, seed=seed)
 
@@ -773,19 +786,19 @@ def test_role_specific_behavior_per_role(
         tick = coerce_int(payload["tick"], "tick")
 
         if from_role == "follower":
-            # FR-4: a follower's only exit is to become a candidate (election timeout)
+            # follower: only exit is to become a candidate (election timeout)
             assert to_role == "candidate", (
                 f"seed={seed} config={config_filename} node={node_id} tick={tick}: "
                 f"follower must exit to candidate, got {to_role!r}"
             )
         elif from_role == "candidate":
-            # CR-1: a candidate always operates in a strictly positive term
+            # candidate: always operates in a strictly positive term
             assert term > 0, (
                 f"seed={seed} config={config_filename} node={node_id} tick={tick}: "
                 f"candidate must have term > 0, got term={term}"
             )
         elif from_role == "leader":
-            # LR-4: a leader's only exit is to step down to follower
+            # leader: only exit is to step down to follower
             assert to_role == "follower", (
                 f"seed={seed} config={config_filename} node={node_id} tick={tick}: "
                 f"leader must exit to follower, got {to_role!r}"
@@ -817,13 +830,10 @@ def test_node_0_message_types_per_role(
     within the same tick, giving an accurate picture of the role at the time
     each message was produced.
 
-    - Follower  (FR-5): only sends RequestVoteResponse / AppendEntriesResponse;
-                        never initiates elections (RequestVote) or heartbeats
-                        (AppendEntries).
-    - Candidate (CR-3): sends RequestVote and response messages; never sends
-                        AppendEntries because it is not yet a leader.
-    - Leader    (LR-2): sends AppendEntries and response messages; never sends
-                        RequestVote because it does not run as a candidate.
+    - Follower:   only sends RequestVoteResponse / AppendEntriesResponse;
+                  never initiates elections (RequestVote) or heartbeats (AppendEntries).
+    - Candidate:  sends RequestVote and response messages; never sends AppendEntries.
+    - Leader:     sends AppendEntries and response messages; never sends RequestVote.
     """
     _, messages = _run_config(config_filename, seed=seed)
 
@@ -846,17 +856,17 @@ def test_node_0_message_types_per_role(
             tick = coerce_int(payload.get("tick"), "tick")
 
             if node_0_role == "follower":
-                # FR-5: follower never initiates an election or heartbeat
+                # follower: never initiates an election or heartbeat
                 assert msg_type not in {"RequestVote", "AppendEntries"}, (
                     f"seed={seed} config={config_filename} tick={tick}: follower node 0 generated {msg_type!r}"
                 )
             elif node_0_role == "candidate":
-                # CR-3: candidate solicits votes but never sends heartbeats
+                # candidate: solicits votes but never sends heartbeats
                 assert msg_type != "AppendEntries", (
                     f"seed={seed} config={config_filename} tick={tick}: candidate node 0 generated {msg_type!r}"
                 )
             elif node_0_role == "leader":
-                # LR-2: leader sends heartbeats but never solicits votes
+                # leader: sends heartbeats but never solicits votes
                 assert msg_type != "RequestVote", (
                     f"seed={seed} config={config_filename} tick={tick}: leader node 0 generated {msg_type!r}"
                 )
@@ -868,3 +878,63 @@ def test_node_0_message_types_per_role(
     assert node_0_messages_seen, (
         f"seed={seed} config={config_filename}: expected at least one message_generated from node 0"
     )
+
+
+@pytest.mark.parametrize("seed", RANDOM_SEEDS)
+@pytest.mark.parametrize(
+    "config_filename",
+    [
+        "system_crash.json",
+        "leader_crash_timed.json",
+        "detailed_filters.json",
+    ],
+)
+# TC counterpart: test_tc_node_0_role_history
+def test_node_0_role_history_matches_transition_from_role(
+    config_filename: str,
+    seed: int,
+) -> None:
+    """Check that from_role in each node 0 transition matches the to_role of the preceding one.
+
+    Events are read from the per-node stream (message.var ==
+    'node_role_transition_node_0') so the list is already filtered to node 0
+    and in emission order — exactly what the DSRV spec sees.
+
+    Two invariants are verified:
+    - First transition: from_role must be 'follower' (every node starts there).
+    - Subsequent transitions: from_role must equal the to_role reported by the
+      immediately preceding transition event.
+    """
+    _, messages = _run_config(config_filename, seed=seed)
+
+    transitions = [
+        message.value.data
+        for message in messages
+        if message.var == "node_role_transition_node_0"
+        and isinstance(message.value.data, dict)
+    ]
+
+    if not transitions:
+        # Node 0 may legitimately remain a follower for the whole simulation
+        # (e.g. another node wins the election before node 0 times out).
+        # The invariant is vacuously satisfied with no transitions to check.
+        return
+
+    # First transition must originate from the initial follower role.
+    first_from = str(transitions[0]["from_role"])
+    first_tick = coerce_int(transitions[0]["tick"], "tick")
+    assert first_from == "follower", (
+        f"seed={seed} config={config_filename} tick={first_tick}: "
+        f"first node 0 transition from_role expected 'follower', got {first_from!r}"
+    )
+
+    # Every subsequent transition: from_role must equal the previous to_role.
+    for prev, curr in zip(transitions, transitions[1:]):
+        prev_to = str(prev["to_role"])
+        curr_from = str(curr["from_role"])
+        curr_tick = coerce_int(curr["tick"], "tick")
+        assert curr_from == prev_to, (
+            f"seed={seed} config={config_filename} tick={curr_tick}: "
+            f"node 0 transition from_role {curr_from!r} != previous to_role {prev_to!r}"
+        )
+

@@ -43,7 +43,14 @@ class RaftEventEmitter:
         self._log_console(event_name, payload, level=level)
         if self.event_logger is None:
             return
-        self.event_logger.emit(event_name, TypedTCData("Map", payload))
+        value = TypedTCData("Map", payload)
+        self.event_logger.emit(event_name, value)
+        # Also emit on a per-node topic for any event that carries a node_id,
+        # using the "{event_name}_node_{node_id}" var-name convention so that
+        # consumers can subscribe to a single node's stream of events.
+        node_id = payload.get("node_id")
+        if isinstance(node_id, int):
+            self.event_logger.emit(f"{event_name}_node_{node_id}", value)
 
     def emit_message_event(
         self,

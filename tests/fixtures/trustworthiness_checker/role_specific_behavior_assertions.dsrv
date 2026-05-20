@@ -4,12 +4,9 @@ out role_behavior_ok: Bool
 
 // Check one key responsibility for each role, discriminated by from_role.
 //
-// Follower  (FR-4): a follower's only valid exit is to become a candidate
-//                   (the election-timeout path).
-// Candidate (CR-1): a candidate always operates in a strictly positive term
-//                   (term was incremented at least once before entering candidacy).
-// Leader    (LR-4): a leader's only valid exit is to step down to follower
-//                   (triggered by observing a higher term).
+// - Follower:   only valid exit is to become a candidate (election-timeout path).
+// - Candidate:  always operates in a strictly positive term (incremented on entry).
+// - Leader:     only valid exit is to step down to follower (higher term observed).
 role_behavior_ok =
   if Map.get(node_role_transition, "from_role") == "follower" then
     Map.get(node_role_transition, "to_role") == "candidate"

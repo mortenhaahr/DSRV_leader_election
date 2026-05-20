@@ -407,6 +407,7 @@ class RaftNode:
                 msg,
                 tick=self.current_time_ms,
                 node_id=self.node_id,
+                extra={"role": self.state.value},
                 level=DEBUG,
             )
 

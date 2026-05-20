@@ -16,11 +16,19 @@ class TopicMapping:
     mapping: dict[VarName, TopicName]
 
     def __getitem__(self, key: VarName) -> TopicName:
-        try:
+        if key in self.mapping:
             return self.mapping[key]
-        except KeyError:
-            # Directly use the key name as the topic name if not found
-            return key
+
+        # Auto-derive a per-node topic from a "{base_var}_node_{N}" key.
+        # e.g. "node_role_transition_node_0" -> "raft/node/role_transition/0"
+        # when "node_role_transition" -> "raft/node/role_transition" is mapped.
+        if "_node_" in key:
+            base, _, node_str = key.rpartition("_node_")
+            if node_str.isdigit() and base in self.mapping:
+                return f"{self.mapping[base]}/{node_str}"
+
+        # Fallback: use the key itself as the topic name
+        return key
 
     def __iter__(self) -> Iterator[VarName]:
         return iter(self.mapping)

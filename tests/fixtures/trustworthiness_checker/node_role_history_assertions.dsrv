@@ -1,0 +1,19 @@
+in node_role_transition_node_0
+
+out role_history_ok: Bool
+
+// The from_role of each transition must equal the to_role of the previous one,
+// confirming a consistent role-history chain.  For the very first transition
+// there is no predecessor, so we check that from_role is "follower" — the
+// role every node starts in.
+//
+// node_role_transition_node_0[1] holds the previous event on this stream.
+// Before the first event it is Deferred; Map.get(Deferred, key) now propagates
+// Deferred rather than panicking, so the if_stm correctly selects the else
+// branch for the first event without needing an auxiliary workaround.
+role_history_ok =
+  if is_defined(node_role_transition_node_0[1]) then
+    Map.get(node_role_transition_node_0, "from_role") ==
+    Map.get(node_role_transition_node_0[1], "to_role")
+  else
+    Map.get(node_role_transition_node_0, "from_role") == "follower"

@@ -1,0 +1,36 @@
+// Previously this spec crashed the TC at startup with:
+//   "Invalid map get. Expected Map expression. Received: Map.get(Deferred)"
+//
+// Root cause (now fixed in the TC):
+//   The [1] past-indexing operator (sindex) prepends one Deferred value to
+//   the stream.  On the very first evaluation the TC fed Deferred into mget.
+//   The old stream_lift1 only short-circuited on Value::NoVal, not on
+//   Value::Deferred, so mget received the Deferred and hit its panic branch.
+//
+//   if-then-else was evaluated eagerly: both branches were reduced before the
+//   correct one was selected.  Even when is_defined(node_role_transition_node_0[1])
+//   was false, the then-branch expression
+//
+//       Map.get(node_role_transition_node_0[1], "to_role")
+//
+//   was still evaluated, causing the crash.
+//
+// TC fix (commit 8430d5e "Correctly handle deferred values in all combinators"):
+//   stream_lift1 now propagates Deferred before invoking the inner function,
+//   so Map.get(Deferred, key) returns Deferred rather than panicking.
+//   if_stm now selects the result from the matching branch only, so Deferred
+//   from the non-selected branch no longer propagates to the output.
+//   Together these changes make this spec behave correctly.
+//
+// See also: node_role_history_assertions.dsrv (the canonical form of this spec).
+
+in node_role_transition_node_0
+
+out role_history_ok: Bool
+
+role_history_ok =
+  if is_defined(node_role_transition_node_0[1]) then
+    Map.get(node_role_transition_node_0, "from_role") ==
+    Map.get(node_role_transition_node_0[1], "to_role")
+  else
+    Map.get(node_role_transition_node_0, "from_role") == "follower"
