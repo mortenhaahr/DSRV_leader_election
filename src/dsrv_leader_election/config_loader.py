@@ -78,6 +78,7 @@ def _base_config_from_args(raw_args: Mapping[str, object]) -> dict[str, object]:
         "node_timeout_range_ms": raw_args.get(
             "node_timeout_range_ms", _DEFAULT_NODE_TIMEOUT_RANGE_MS
         ),
+        "real_time_factor": raw_args.get("real_time_factor"),
         "filters": [],
     }
 
@@ -90,6 +91,11 @@ def _validated_simulation_from_mapping(
     raw_filters = config.get("filters", [])
     if not isinstance(raw_filters, list):
         raise ValueError("filters must be a list")
+
+    raw_rtf = config.get("real_time_factor")
+    real_time_factor = (
+        coerce_float(raw_rtf, "real_time_factor") if raw_rtf is not None else None
+    )
 
     return Simulation(
         seed=coerce_int(config.get("seed"), "seed"),
@@ -105,6 +111,7 @@ def _validated_simulation_from_mapping(
         filters=cast(list[Filter], raw_filters),
         event_emitter=event_emitter,
         log_level=str(config.get("log_level", _DEFAULT_LOG_LEVEL)),
+        real_time_factor=real_time_factor,
     )
 
 

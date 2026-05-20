@@ -80,6 +80,8 @@ def print_config_summary(simulation: Simulation) -> None:
     print(f"  seed={simulation.seed}")
     print(f"  log_level={simulation.log_level}")
     print(f"  node_timeout_range_ms={simulation.node_timeout_range}")
+    rtf = simulation.real_time_factor
+    print(f"  real_time_factor={'unlimited' if rtf is None else rtf}")
     print(f"  filters={filter_summary if filter_summary else 'None'}")
 
 

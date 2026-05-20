@@ -26,6 +26,16 @@ def cli_parse_args() -> argparse.Namespace:
     )
 
     _ = parser.add_argument("--duration-s", type=_positive_float, default=0.5)
+    _ = parser.add_argument(
+        "--real-time-factor",
+        type=_positive_float,
+        default=None,
+        help=(
+            "Cap simulation speed as a multiple of real time. "
+            "1.0 = real-time, 2.0 = twice real-time. "
+            "Omit (default) for maximum speed."
+        ),
+    )
     _ = parser.add_argument("--num-nodes", type=_positive_int, default=3)
     _ = parser.add_argument("--tick-ms", type=_positive_int, default=1)
     _ = parser.add_argument(

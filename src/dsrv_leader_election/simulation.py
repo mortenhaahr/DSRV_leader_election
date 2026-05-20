@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from .event_logger.raft_event_emitter import RaftEventEmitter
 from .filters import Filter
 from .message_scheduler import MessageScheduler
@@ -18,6 +20,7 @@ class Simulation:
     node_timeout_range: tuple[int, int]
     filters: list[Filter]
     log_level: str
+    real_time_factor: float | None
     event_emitter: RaftEventEmitter
     _has_run: bool
 
@@ -32,8 +35,8 @@ class Simulation:
         filters: list[Filter] | None = None,
         event_emitter: RaftEventEmitter | None = None,
         log_level: str = "INFO",
+        real_time_factor: float | None = None,
     ):
-
         self.seed = seed
         self.num_nodes = num_nodes
         self.duration_s = duration_s
@@ -42,6 +45,7 @@ class Simulation:
         self.node_timeout_range = node_timeout_limits
         self.filters = filters or []
         self.log_level = log_level
+        self.real_time_factor = real_time_factor
         self.event_emitter = event_emitter or RaftEventEmitter()
         self._has_run = False
 
@@ -86,8 +90,15 @@ class Simulation:
         for filter_obj in self.filters:
             scheduler.add_filter(filter_obj)
 
+        tick_wall_s = tick_ms / 1000.0
+        real_time_factor = self.real_time_factor
+        target_tick_duration_s = (
+            tick_wall_s / real_time_factor if real_time_factor is not None else None
+        )
+
         next_tick_messages: list[ElectionMessage] = []
         for tick in range(0, int(self.duration_s * 1000), tick_ms):
+            tick_start = time.monotonic() if target_tick_duration_s is not None else 0.0
             simulation_run_context.set_tick_time(tick)
             self.event_emitter.emit_map(
                 "simulation_tick",
@@ -127,6 +138,12 @@ class Simulation:
                     if node.node_id == message.receiver:
                         next_tick_messages.extend(node.handle_message(message))
                         break
+
+            if target_tick_duration_s is not None:
+                elapsed = time.monotonic() - tick_start
+                remaining = target_tick_duration_s - elapsed
+                if remaining > 0:
+                    time.sleep(remaining)
 
         final_leader_id = None
         for node in nodes:
