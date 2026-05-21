@@ -20,8 +20,17 @@
   "leader_elected": {
     "topic": "raft/node/leader_elected"
   },
-  "message_generated": {
-    "topic": "raft/message/generated"
+  "request_vote": {
+    "topic": "raft/message/request_vote"
+  },
+  "request_vote_response": {
+    "topic": "raft/message/request_vote_response"
+  },
+  "append_entries": {
+    "topic": "raft/message/append_entries"
+  },
+  "append_entries_response": {
+    "topic": "raft/message/append_entries_response"
   },
   "message_scheduled": {
     "topic": "raft/message/scheduled"

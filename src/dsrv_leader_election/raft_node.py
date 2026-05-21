@@ -16,6 +16,13 @@ from .messages import (
     RequestVoteResponse,
 )
 
+_RAFT_MSG_EVENT_NAMES: dict[str, str] = {
+    "RequestVote": "request_vote",
+    "RequestVoteResponse": "request_vote_response",
+    "AppendEntries": "append_entries",
+    "AppendEntriesResponse": "append_entries_response",
+}
+
 
 class Role(Enum):
     FOLLOWER = "follower"
@@ -23,7 +30,7 @@ class Role(Enum):
     LEADER = "leader"
 
 
-class _RoleBehavior(ABC):
+class _RoleBehaviour(ABC):
     @property
     @abstractmethod
     def role(self) -> Role:
@@ -40,7 +47,7 @@ class _RoleBehavior(ABC):
         pass
 
 
-class _FollowerBehavior(_RoleBehavior):
+class _FollowerBehaviour(_RoleBehaviour):
     last_heartbeat_ms: int
     next_deadline: int
     voted_for: int | None
@@ -144,7 +151,7 @@ class _FollowerBehavior(_RoleBehavior):
         return []
 
 
-class _CandidateBehavior(_RoleBehavior):
+class _CandidateBehaviour(_RoleBehaviour):
     last_heartbeat_ms: int
     next_deadline: int
     votes_received: int
@@ -255,7 +262,7 @@ class _CandidateBehavior(_RoleBehavior):
         return []
 
 
-class _LeaderBehavior(_RoleBehavior):
+class _LeaderBehaviour(_RoleBehaviour):
     heartbeat_interval_ms: int
     last_heartbeat_sent_ms: int
 
@@ -349,7 +356,7 @@ class _LeaderBehavior(_RoleBehavior):
 
 
 class RaftNode:
-    """Raft node that delegates role-specific behavior to a composed state object."""
+    """Raft node that delegates role-specific behaviour to a composed state object."""
 
     node_id: int
     cluster_size: int
@@ -358,7 +365,7 @@ class RaftNode:
     rng: random.Random
     deadline_range: tuple[int, int]
     heartbeat_interval_ms: int
-    _behavior: _RoleBehavior
+    _behaviour: _RoleBehaviour
     state: Role
     event_emitter: RaftEventEmitter
 
@@ -381,11 +388,11 @@ class RaftNode:
         self.rng = random.Random(seed)
         self.deadline_range = deadline_range
         self.heartbeat_interval_ms = heartbeat_interval_ms
-        self._behavior = _FollowerBehavior(
+        self._behaviour = _FollowerBehaviour(
             last_heartbeat_ms=self.current_time_ms,
             next_deadline=self.draw_election_deadline(),
         )
-        self.state = self._behavior.role
+        self.state = self._behaviour.role
         self.event_emitter.emit_map(
             "node_initialized",
             {
@@ -402,38 +409,40 @@ class RaftNode:
         if not messages:
             return
         for msg in messages:
+            event_name = _RAFT_MSG_EVENT_NAMES.get(
+                type(msg).__name__, "message_generated"
+            )
             self.event_emitter.emit_message_event(
-                "message_generated",
+                event_name,
                 msg,
                 tick=self.current_time_ms,
                 node_id=self.node_id,
-                extra={"role": self.state.value},
                 level=DEBUG,
             )
 
     def handle_tick(self, tick_time_ms: int) -> list[ElectionMessage]:
-        """Update internal time and execute role-specific tick behavior."""
+        """Update internal time and execute role-specific tick behaviour."""
         self.current_time_ms = tick_time_ms
-        messages = self._behavior.handle_tick(self)
+        messages = self._behaviour.handle_tick(self)
         self._emit_generated_messages(messages)
         return messages
 
     def handle_message(self, message: ElectionMessage) -> list[ElectionMessage]:
-        """Dispatch an incoming election message to the current role behavior."""
+        """Dispatch an incoming election message to the current role behaviour."""
         self.event_emitter.emit_message_event(
             "message_received",
             message,
             tick=self.current_time_ms,
             node_id=self.node_id,
         )
-        messages = self._behavior.handle_message(self, message)
+        messages = self._behaviour.handle_message(self, message)
         self._emit_generated_messages(messages)
         return messages
 
-    def _transition_to(self, behavior: _RoleBehavior) -> None:
+    def _transition_to(self, behaviour: _RoleBehaviour) -> None:
         logger = logging.getLogger()
         from_role = self.state.value
-        to_role = behavior.role.value
+        to_role = behaviour.role.value
         logger.log(
             INFO,
             "node_event=transition node_id=%s from_role=%s to_role=%s term=%s",
@@ -453,8 +462,8 @@ class RaftNode:
                 "term": self.current_term,
             },
         )
-        self._behavior = behavior
-        self.state = behavior.role
+        self._behaviour = behaviour
+        self.state = behaviour.role
 
     def draw_election_deadline(self) -> int:
         return self.rng.randint(*self.deadline_range)
@@ -479,7 +488,7 @@ class RaftNode:
             )
 
         self._transition_to(
-            _FollowerBehavior(
+            _FollowerBehaviour(
                 last_heartbeat_ms=self.current_time_ms,
                 next_deadline=self.draw_election_deadline(),
                 voted_for=None,
@@ -501,7 +510,7 @@ class RaftNode:
         )
 
         self._transition_to(
-            _CandidateBehavior(
+            _CandidateBehaviour(
                 last_heartbeat_ms=self.current_time_ms,
                 next_deadline=self.draw_election_deadline(),
                 votes_received=1,
@@ -522,15 +531,15 @@ class RaftNode:
 
     def become_leader(self) -> list[ElectionMessage]:
 
-        leader_behavior = _LeaderBehavior(
+        leader_behaviour = _LeaderBehaviour(
             heartbeat_interval_ms=self.heartbeat_interval_ms,
             last_heartbeat_sent_ms=self.current_time_ms,
         )
         # When sending initial AppendEntries, update last_heartbeat_sent_ms to current_time_ms + heartbeat_interval
-        leader_behavior.last_heartbeat_sent_ms = (
+        leader_behaviour.last_heartbeat_sent_ms = (
             self.current_time_ms + self.heartbeat_interval_ms
         )
-        self._transition_to(leader_behavior)
+        self._transition_to(leader_behaviour)
         self.event_emitter.emit_map(
             "leader_elected",
             {

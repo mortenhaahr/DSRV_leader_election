@@ -1,0 +1,14 @@
+{
+  "request_vote_node_0": {
+    "topic": "raft/message/request_vote/0"
+  },
+  "request_vote_response_node_0": {
+    "topic": "raft/message/request_vote_response/0"
+  },
+  "append_entries_node_0": {
+    "topic": "raft/message/append_entries/0"
+  },
+  "append_entries_response_node_0": {
+    "topic": "raft/message/append_entries_response/0"
+  }
+}

@@ -1,7 +1,7 @@
 # AGENTS.md — RAFT Leader Election Case Study Guide
 
 This repository develops a **simple, academically credible distributed leader-election prototype using RAFT**.
-Primary goal: implement and evaluate RAFT leader election behavior (not full log replication) in a way suitable for a conference case study.
+Primary goal: implement and evaluate RAFT leader election behaviour (not full log replication) in a way suitable for a conference case study.
 
 ## Documentation
 - a simple introduction to the project is is README.md

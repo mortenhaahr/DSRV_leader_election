@@ -130,7 +130,10 @@ def _message_event_sequence(
 
         event_name = data.get("event")
         if event_name not in {
-            "message_generated",
+            "request_vote",
+            "request_vote_response",
+            "append_entries",
+            "append_entries_response",
             "message_scheduled",
             "message_delivered",
             "message_received",
@@ -227,22 +230,22 @@ def test_system_crash_exact_message_event_prefix_for_seed_42() -> None:
 
     sequence = _message_event_sequence(messages)
     expected_prefix = [
-        ("message_generated", "RequestVote", 1, 1, 0, 159),
-        ("message_generated", "RequestVote", 2, 1, 2, 159),
+        ("request_vote", "RequestVote", 1, 1, 0, 159),
+        ("request_vote", "RequestVote", 2, 1, 2, 159),
         ("message_scheduled", "RequestVote", 1, 1, 0, 158),
         ("message_scheduled", "RequestVote", 2, 1, 2, 158),
         ("message_delivered", "RequestVote", 1, 1, 0, 159),
         ("message_received", "RequestVote", 1, 1, 0, 159),
-        ("message_generated", "RequestVoteResponse", 3, 0, 1, 159),
+        ("request_vote_response", "RequestVoteResponse", 3, 0, 1, 159),
         ("message_delivered", "RequestVote", 2, 1, 2, 159),
         ("message_received", "RequestVote", 2, 1, 2, 159),
-        ("message_generated", "RequestVoteResponse", 4, 2, 1, 159),
+        ("request_vote_response", "RequestVoteResponse", 4, 2, 1, 159),
         ("message_scheduled", "RequestVoteResponse", 3, 0, 1, 159),
         ("message_scheduled", "RequestVoteResponse", 4, 2, 1, 159),
         ("message_delivered", "RequestVoteResponse", 3, 0, 1, 160),
         ("message_received", "RequestVoteResponse", 3, 0, 1, 160),
-        ("message_generated", "AppendEntries", 5, 1, 0, 160),
-        ("message_generated", "AppendEntries", 6, 1, 2, 160),
+        ("append_entries", "AppendEntries", 5, 1, 0, 160),
+        ("append_entries", "AppendEntries", 6, 1, 2, 160),
         ("message_delivered", "RequestVoteResponse", 4, 2, 1, 160),
         ("message_received", "RequestVoteResponse", 4, 2, 1, 160),
     ]
@@ -760,8 +763,8 @@ def test_candidate_to_leader_transition_has_matching_leader_elected_event_same_t
         "detailed_filters.json",
     ],
 )
-# TC counterpart: test_tc_role_specific_behavior
-def test_role_specific_behavior_per_role(
+# TC counterpart: test_tc_role_specific_behaviour
+def test_role_specific_behaviour_per_role(
     config_filename: str,
     seed: int,
 ) -> None:
@@ -818,7 +821,7 @@ def test_role_specific_behavior_per_role(
         "detailed_filters.json",
     ],
 )
-# TC counterpart: test_tc_node_specific_behavior
+# TC counterpart: test_tc_node_specific_behaviour
 def test_node_0_message_types_per_role(
     config_filename: str,
     seed: int,
@@ -850,7 +853,16 @@ def test_node_0_message_types_per_role(
         if event == "node_role_transition" and node_id == 0:
             node_0_role = str(payload["to_role"])
 
-        elif event == "message_generated" and node_id == 0:
+        elif (
+            event
+            in {
+                "request_vote",
+                "request_vote_response",
+                "append_entries",
+                "append_entries_response",
+            }
+            and node_id == 0
+        ):
             node_0_messages_seen = True
             msg_type = str(payload.get("msg_type", ""))
             tick = coerce_int(payload.get("tick"), "tick")
@@ -876,7 +888,7 @@ def test_node_0_message_types_per_role(
                 )
 
     assert node_0_messages_seen, (
-        f"seed={seed} config={config_filename}: expected at least one message_generated from node 0"
+        f"seed={seed} config={config_filename}: expected at least one message-generated event from node 0"
     )
 
 
@@ -937,4 +949,3 @@ def test_node_0_role_history_matches_transition_from_role(
             f"seed={seed} config={config_filename} tick={curr_tick}: "
             f"node 0 transition from_role {curr_from!r} != previous to_role {prev_to!r}"
         )
-

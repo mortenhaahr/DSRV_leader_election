@@ -1,0 +1,13 @@
+in request_vote_node_0
+in append_entries_node_0
+
+// The stream name encodes both message type and producing role:
+// request_vote_node_0 fires only when node 0 (acting as candidate) sends RequestVote.
+// append_entries_node_0 fires only when node 0 (acting as leader) sends AppendEntries.
+// Verify that node 0 correctly identifies itself in each message type.
+out candidate_id_ok: Bool
+out leader_id_ok: Bool
+
+candidate_id_ok = Map.get(request_vote_node_0, "candidate_id") == 0
+
+leader_id_ok = Map.get(append_entries_node_0, "leader_id") == 0

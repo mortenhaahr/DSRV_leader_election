@@ -1,0 +1,80 @@
+in request_vote_node_0
+in request_vote_response_node_0
+in append_entries_node_0
+in append_entries_response_node_0
+
+aux prev_rv
+aux prev_rvr
+aux prev_ae
+aux prev_aer
+
+out candidate_broadcast_ok: Bool
+out candidate_term_ok: Bool
+out vote_grant_unique_ok: Bool
+out leader_broadcast_ok: Bool
+out leader_term_ok: Bool
+out heartbeat_sender_ok: Bool
+
+// Streams which find the last genuinely unique value of a request vote
+// (distinguished by msg_id, since the async semantics may cause a repeat of the
+// same value multiple times)
+
+prev_rv =
+  if !(Map.get(request_vote_node_0[1], "msg_id") == Map.get(request_vote_node_0, "msg_id")) then
+    request_vote_node_0[1]
+  else
+    prev_rv[1]
+
+prev_rvr =
+  if !(Map.get(request_vote_response_node_0[1], "msg_id") == Map.get(request_vote_response_node_0, "msg_id")) then
+    request_vote_response_node_0[1]
+  else
+    prev_rvr[1]
+
+prev_ae =
+  if !(Map.get(append_entries_node_0[1], "msg_id") == Map.get(append_entries_node_0, "msg_id")) then
+    append_entries_node_0[1]
+  else
+    prev_ae[1]
+
+prev_aer =
+  if !(Map.get(append_entries_response_node_0[1], "msg_id") == Map.get(append_entries_response_node_0, "msg_id")) then
+    append_entries_response_node_0[1]
+  else
+    prev_aer[1]
+
+// Candidate: consecutive same-election RequestVotes target different receivers.
+candidate_broadcast_ok =
+  (Map.get(request_vote_node_0, "term") == Map.get(prev_rv, "term")) =>
+  !(Map.get(request_vote_node_0, "receiver") == Map.get(prev_rv, "receiver"))
+
+// Candidate: election terms in consecutive RequestVotes never decrease.
+candidate_term_ok =
+  Map.get(request_vote_node_0, "term") >= Map.get(prev_rv, "term")
+
+// Voter (Anyone): two consecutively granted votes must be in strictly
+// increasing terms (at most one vote per term).
+vote_grant_unique_ok =
+  (Map.get(request_vote_response_node_0, "vote_granted") &&
+   Map.get(prev_rvr, "vote_granted")) =>
+  (Map.get(request_vote_response_node_0, "term") >
+   Map.get(prev_rvr, "term"))
+
+// Leader: consecutive same-epoch AppendEntries target different receivers.
+leader_broadcast_ok =
+  (Map.get(append_entries_node_0, "term") == Map.get(prev_ae, "term")) =>
+  !(Map.get(append_entries_node_0, "receiver") == Map.get(prev_ae, "receiver"))
+
+// Leader: heartbeat terms in consecutive AppendEntries never decrease.
+leader_term_ok =
+  Map.get(append_entries_node_0, "term") >= Map.get(prev_ae, "term")
+
+// Follower: consecutive successful heartbeat responses in the same term
+// go back to the same leader (at most one leader per term).
+heartbeat_sender_ok =
+  (Map.get(append_entries_response_node_0, "success") &&
+   Map.get(prev_aer, "success") &&
+   (Map.get(append_entries_response_node_0, "term") ==
+    Map.get(prev_aer, "term"))) =>
+  (Map.get(append_entries_response_node_0, "receiver") ==
+   Map.get(prev_aer, "receiver"))

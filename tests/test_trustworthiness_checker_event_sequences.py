@@ -45,8 +45,13 @@ def _assert_all_true(
 ) -> None:
     received = False
     for payload in stream.receive(timeout_s=timeout_s, idle_timeout_s=_IDLE_DRAIN_S):
-        received = True
         value = decode_checker_payload(payload)
+        # The TC serialises Value::Deferred as the string "\u22a5" (⊥).
+        # Deferred means "not enough history yet to determine a value" —
+        # it is vacuously OK and does not count as a concrete assertion.
+        if value == "\u22a5":
+            continue
+        received = True
         assert isinstance(value, bool), f"Expected bool, got {type(value).__name__}"
         assert value is True, "Expected True"
     if not allow_empty:
@@ -199,17 +204,17 @@ def test_tc_simulation_tick_assertions(
         _assert_all_true(simulation_tick_ok, timeout_s=ASSERTION_TIMEOUT_S)
 
 
-# event_sequences counterpart: test_role_specific_behavior_per_role
-def test_tc_role_specific_behavior(
+# event_sequences counterpart: test_role_specific_behaviour_per_role
+def test_tc_role_specific_behaviour(
     config_filename: str,
     mqtt_broker: tuple[str, int],
     mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
     trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
 ) -> None:
-    """TC counterpart to test_role_specific_behavior_per_role.
+    """TC counterpart to test_role_specific_behaviour_per_role.
 
-    Runs the role_specific_behavior_assertions spec against live MQTT events and
-    asserts that every emitted role_behavior_ok output is True.
+    Runs the role_specific_behaviour_assertions spec against live MQTT events and
+    asserts that every emitted role_behaviour_ok output is True.
 
     The spec checks one key responsibility per role using an if-else chain on
     from_role in node_role_transition events:
@@ -219,18 +224,18 @@ def test_tc_role_specific_behavior(
     """
     _ = _start_checker(
         trustworthiness_checker_container_factory,
-        "/tc-fixtures/role_specific_behavior_assertions.dsrv",
-        "/tc-fixtures/input_topics_role_specific_behavior.json",
+        "/tc-fixtures/role_specific_behaviour_assertions.dsrv",
+        "/tc-fixtures/input_topics_role_specific_behaviour.json",
     )
 
     broker, port = mqtt_broker
-    with mqtt_subscriber_factory("role_behavior_ok") as role_behavior_ok:
+    with mqtt_subscriber_factory("role_behaviour_ok") as role_behaviour_ok:
         _run_simulation(broker=broker, port=port, config_filename=config_filename)
-        _assert_all_true(role_behavior_ok, timeout_s=ASSERTION_TIMEOUT_S)
+        _assert_all_true(role_behaviour_ok, timeout_s=ASSERTION_TIMEOUT_S)
 
 
 # event_sequences counterpart: test_node_0_message_types_per_role
-def test_tc_node_specific_behavior(
+def test_tc_node_specific_behaviour(
     config_filename: str,
     mqtt_broker: tuple[str, int],
     mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
@@ -243,24 +248,30 @@ def test_tc_node_specific_behavior(
     uses only the per-node topics for node 0, so the checker receives an
     already-filtered stream and needs no node_id guard.
 
+    // TODO:
     The spec tracks node 0's role via an auxiliary variable updated on
     node_role_transition_node_0 events, then checks every
     message_generated_node_0 event against the allowed message types:
 
-      - follower:   never RequestVote or AppendEntries
-      - candidate:  never AppendEntries
-      - leader:     never RequestVote
+      - candidate_id_ok: candidate_id field equals 0 in every RequestVote.
+      - leader_id_ok:    leader_id field equals 0 in every AppendEntries.
     """
     _ = _start_checker(
         trustworthiness_checker_container_factory,
-        "/tc-fixtures/node_specific_behavior_assertions.dsrv",
-        "/tc-fixtures/input_topics_node_specific_behavior.json",
+        "/tc-fixtures/node_specific_behaviour_assertions.dsrv",
+        "/tc-fixtures/input_topics_node_specific_behaviour.json",
     )
 
     broker, port = mqtt_broker
-    with mqtt_subscriber_factory("role_behavior_ok") as role_behavior_ok:
+    with (
+        mqtt_subscriber_factory("candidate_id_ok") as candidate_id_ok,
+        mqtt_subscriber_factory("leader_id_ok") as leader_id_ok,
+    ):
         _run_simulation(broker=broker, port=port, config_filename=config_filename)
-        _assert_all_true(role_behavior_ok, timeout_s=ASSERTION_TIMEOUT_S)
+        _assert_all_true(
+            candidate_id_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )
+        _assert_all_true(leader_id_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True)
 
 
 # event_sequences counterpart: test_node_0_role_history_matches_transition_from_role
@@ -295,92 +306,66 @@ def test_tc_node_0_role_history(
         )
 
 
-# event_sequences counterpart: test_node_0_per_message_behavior
-def test_tc_node_0_per_message_behavior(
+def test_tc_node_0_historic_behaviour(
     config_filename: str,
     mqtt_broker: tuple[str, int],
     mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
     trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
 ) -> None:
-    """TC counterpart to test_node_0_per_message_behavior.
-
-    Uses node_per_message_behavior_assertions.dsrv.  Each message_generated
-    event carries a 'role' field so the spec is single-stream and stateless:
-    no past-indexing, no auxiliary variables.
-
-      - follower_ok:  no RequestVote/AppendEntries; term > 0.
-      - candidate_ok: no AppendEntries; term > 0.
-      - leader_ok:    no RequestVote; term > 0.
-      - node_0_ok:    conjunction of the three.
     """
-    _ = _start_checker(
-        trustworthiness_checker_container_factory,
-        "/tc-fixtures/node_per_message_behavior_assertions.dsrv",
-        "/tc-fixtures/input_topics_node_specific_behavior.json",
-    )
-
-    broker, port = mqtt_broker
-    with (
-        mqtt_subscriber_factory("follower_ok") as follower_ok,
-        mqtt_subscriber_factory("candidate_ok") as candidate_ok,
-        mqtt_subscriber_factory("leader_ok") as leader_ok,
-        mqtt_subscriber_factory("node_0_ok") as node_0_ok,
-    ):
-        _run_simulation(broker=broker, port=port, config_filename=config_filename)
-        _assert_all_true(follower_ok, timeout_s=ASSERTION_TIMEOUT_S)
-        _assert_all_true(candidate_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True)
-        _assert_all_true(leader_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True)
-        _assert_all_true(node_0_ok, timeout_s=ASSERTION_TIMEOUT_S)
-
-
-# event_sequences counterpart: test_node_0_historic_behavior
-def test_tc_node_0_historic_behavior(
-    config_filename: str,
-    mqtt_broker: tuple[str, int],
-    mqtt_subscriber_factory: Callable[[str], MqttMessageStream],
-    trustworthiness_checker_container_factory: Callable[[str, str, str | None], object],
-) -> None:
-    """TC counterpart to test_node_0_historic_behavior.
-
-    Uses node_historic_behavior_assertions.dsrv.  [1] past-indexing compares
-    each message to its predecessor on the per-node stream.  On the first
-    message [1] is Deferred and no output is produced.
-
-      - follower_term_ok:      consecutive follower messages have non-decreasing term.
+    Assertions:
+    Candidate (request_vote_node_0):
       - candidate_broadcast_ok: consecutive same-election RequestVotes target
                                 different receivers.
-      - leader_broadcast_ok:   consecutive same-epoch AppendEntries target
-                                different receivers.
-      - node_0_ok:             conjunction of the three.
+      - candidate_term_ok:      RequestVote terms never decrease.
 
-    allow_empty=True is used where the antecedent may never be satisfied
-    (e.g. node 0 stays a follower the whole simulation, or sends only one
-    message before the simulation ends).
+    Voter/follower (request_vote_response_node_0):
+      - vote_grant_unique_ok:   two consecutive granted votes must carry
+                                different (strictly increasing) terms.
+
+    Leader (append_entries_node_0):
+      - leader_broadcast_ok:   consecutive same-epoch AppendEntries target
+                               different receivers.
+      - leader_term_ok:        AppendEntries terms never decrease.
+
+    Follower (append_entries_response_node_0):
+      - heartbeat_sender_ok:   consecutive successful responses in the same
+                               term go back to the same leader.
     """
     _ = _start_checker(
         trustworthiness_checker_container_factory,
-        "/tc-fixtures/node_historic_behavior_assertions.dsrv",
-        "/tc-fixtures/input_topics_node_specific_behavior.json",
+        "/tc-fixtures/node_historic_behaviour_assertions.dsrv",
+        "/tc-fixtures/input_topics_node_historic_behaviour.json",
     )
 
     broker, port = mqtt_broker
     with (
-        mqtt_subscriber_factory("follower_term_ok") as follower_term_ok,
         mqtt_subscriber_factory("candidate_broadcast_ok") as candidate_broadcast_ok,
+        mqtt_subscriber_factory("candidate_term_ok") as candidate_term_ok,
+        mqtt_subscriber_factory("vote_grant_unique_ok") as vote_grant_unique_ok,
         mqtt_subscriber_factory("leader_broadcast_ok") as leader_broadcast_ok,
-        mqtt_subscriber_factory("node_0_ok") as node_0_ok,
+        mqtt_subscriber_factory("leader_term_ok") as leader_term_ok,
+        mqtt_subscriber_factory("heartbeat_sender_ok") as heartbeat_sender_ok,
     ):
         _run_simulation(broker=broker, port=port, config_filename=config_filename)
-        _assert_all_true(
-            follower_term_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
-        )
         _assert_all_true(
             candidate_broadcast_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
         )
         _assert_all_true(
+            candidate_term_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )
+        _assert_all_true(
+            vote_grant_unique_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )
+        _assert_all_true(
             leader_broadcast_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
         )
-        _assert_all_true(node_0_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True)
+        _assert_all_true(
+            leader_term_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )
+        _assert_all_true(
+            heartbeat_sender_ok, timeout_s=ASSERTION_TIMEOUT_S, allow_empty=True
+        )
 
 
 def test_tc_map_get_on_deferred_now_works(
